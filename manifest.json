@@ -1,0 +1,20 @@
+// english-card-game/public/manifest.json
+{
+  "name": "English Card Game",
+  "short_name": "EnglishCard",
+  "description": "Master English vocabulary with flashcards",
+  "start_url": "/game",
+  "display": "standalone",
+  "background_color": "#0D0F1A",
+  "theme_color": "#0D0F1A",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [
+    { "src": "/screenshots/game.png", "sizes": "1080x1920", "type": "image/png", "label": "Game screen" }
+  ],
+  "categories": ["education", "games"],
+  "lang": "th"
+}
