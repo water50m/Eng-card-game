@@ -2,6 +2,7 @@
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
 import { ThemeProvider } from "../themes/ThemeProvider"
+import { FontSizeInit } from "../components/FontSizeInit"
 
 export const metadata: Metadata = {
   title: "English Card Game",
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body suppressHydrationWarning>
         <ThemeProvider>
+          <FontSizeInit/>
           {children}
         </ThemeProvider>
       </body>

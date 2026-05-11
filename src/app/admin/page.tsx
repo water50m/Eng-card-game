@@ -191,7 +191,7 @@ export default function AdminPage() {
                   <motion.div
                     key={u.id}
                     initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                    layout
+                    layout="position"
                     style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", borderRadius: "14px", border: "1px solid var(--border-default)", background: "var(--bg-surface)" }}
                   >
                     <div style={{ fontSize: "24px" }}>{u.emoji}</div>
@@ -225,6 +225,39 @@ export default function AdminPage() {
             <motion.div key="settings" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
               style={{ display: "flex", flexDirection: "column", gap: "14px" }}
             >
+              {/* Font size per user */}
+              <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "16px", padding: "20px", marginBottom: "0" }}>
+                <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: "0 0 12px" }}>
+                  🔤 ขนาดตัวอักษรต่อ User
+                </h3>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: "var(--text-muted)", margin: "0 0 14px" }}>
+                  Admin สามารถตั้งขนาดตัวอักษรให้แต่ละ user ได้
+                </p>
+                {users.filter(u=>!u.isAdmin).map(u => {
+                  const fsKey = `ecg-font-size-${u.id}`
+                  const current = (typeof window !== "undefined" ? localStorage.getItem(fsKey) : null) || "md"
+                  return (
+                    <div key={u.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border-default)" }}>
+                      <span style={{ fontFamily: "var(--font-body)", fontSize: "14px", color: "var(--text-primary)" }}>{u.emoji} {u.name}</span>
+                      <div style={{ display: "flex", gap: "4px" }}>
+                        {(["sm","md","lg","xl"] as const).map(l => (
+                          <button key={l} onClick={() => {
+                            try { localStorage.setItem(fsKey, l) } catch {}
+                            showToast(`ตั้งขนาด ${l} ให้ ${u.name}`)
+                          }} style={{
+                            padding: "4px 10px", borderRadius: "8px", border: "1px solid",
+                            borderColor: current === l ? "var(--accent-primary)" : "var(--border-default)",
+                            background: current === l ? "var(--accent-primary)" : "transparent",
+                            color: current === l ? "var(--text-on-accent)" : "var(--text-muted)",
+                            fontFamily: "var(--font-mono)", fontSize: "12px", cursor: "pointer",
+                          }}>{l.toUpperCase()}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
               {/* PIN toggle */}
               <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "16px", padding: "20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>

@@ -11,7 +11,7 @@ import {
 
 const GOOGLE_FONTS = [
   { label:"Outfit (modern)",   import:"https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap",       display:"'Outfit',sans-serif",   body:"'Outfit',sans-serif",   mono:"'Outfit',monospace" },
-  { label:"Inter (clean)",     import:"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",            display:"'Inter',sans-serif",    body:"'Inter',sans-serif",    mono:"'Inter',monospace" },
+  { label:"Inter (clean)",     import:"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",             display:"'Inter',sans-serif",    body:"'Inter',sans-serif",    mono:"'Inter',monospace" },
   { label:"Quicksand (round)", import:"https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap",    display:"'Quicksand',sans-serif",body:"'Quicksand',sans-serif",mono:"'Quicksand',monospace" },
   { label:"Lora (serif)",      import:"https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&display=swap", display:"'Lora',serif",          body:"'Lora',serif",          mono:"'Lora',monospace" },
   { label:"Space Mono",        import:"https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap",           display:"'Space Mono',monospace",body:"'Space Mono',monospace",mono:"'Space Mono',monospace" },
@@ -130,13 +130,17 @@ function PreviewCard({t}:{t:Theme}) {
 }
 
 export default function ThemeEditorPage() {
-  const { setTheme, reloadCustomThemes } = useTheme()
+  const { setTheme, reloadCustomThemes, theme } = useTheme()
   const [mounted,setMounted]     = useState(false)
+  const [isPreviewing,setIsPreviewing] = useState(false)
   const [editing,setEditing]     = useState<Theme>(blankTheme())
   const [customList,setCustomList] = useState<Theme[]>([])
   const [group,setGroup]         = useState("Background")
   const [toast,setToast]         = useState("")
   const [tab,setTab]             = useState<"create"|"manage">("create")
+  const [inputMode,setInputMode] = useState<"visual"|"json">("visual")
+  const [jsonText,setJsonText]   = useState("")
+  const [jsonError,setJsonError] = useState("")
 
   useEffect(()=>{ setMounted(true); setCustomList(loadCustomThemes()) },[])
 
@@ -156,9 +160,41 @@ export default function ThemeEditorPage() {
     toast2("✓ บันทึกและใช้งานแล้ว!")
   }
 
+  function applyJson(){
+    setJsonError("")
+    try {
+      const raw = jsonText.trim()
+      // Accept both full Theme object and just colors object
+      let parsed = JSON.parse(raw)
+      if(parsed.colors){ // full theme
+        setEditing(prev=>({...prev,...parsed,colors:{...prev.colors,...parsed.colors},fonts:parsed.fonts??prev.fonts}))
+      } else { // just colors
+        setEditing(prev=>({...prev,colors:{...prev.colors,...parsed}}))
+      }
+      setInputMode("visual")
+      toast2("✓ นำเข้า JSON สำเร็จ")
+    } catch(e:any){
+      setJsonError("JSON ไม่ถูกต้อง: " + e.message)
+    }
+  }
+
+  function exportJson(){
+    return JSON.stringify({
+      id:editing.id, name:editing.name, emoji:editing.emoji, isDark:editing.isDark,
+      colors:editing.colors, fonts:editing.fonts,
+    }, null, 2)
+  }
+
   function previewNow(){
     const root=document.documentElement
     Object.entries(themeToCSSVars(editing)).forEach(([k,v])=>root.style.setProperty(k,v))
+    setIsPreviewing(true)
+  }
+  function unpreview(){
+    if(!theme) return
+    const root=document.documentElement
+    Object.entries(themeToCSSVars(theme as unknown as Theme)).forEach(([k,v])=>root.style.setProperty(k,v))
+    setIsPreviewing(false)
   }
 
   function cloneBuiltin(t:Theme){
@@ -214,6 +250,49 @@ export default function ThemeEditorPage() {
           <div style={{display:"grid",gridTemplateColumns:"1fr min(360px,42%)",gap:"20px",alignItems:"start"}}>
             {/* Left controls */}
             <div style={{display:"flex",flexDirection:"column",gap:"14px"}}>
+
+              {/* Input mode toggle */}
+              <div style={{display:"flex",gap:"8px",marginBottom:"4px"}}>
+                {(["visual","json"] as const).map(m=>(
+                  <button key={m} onClick={()=>{
+                    if(m==="json") setJsonText(exportJson())
+                    setInputMode(m)
+                  }} style={{
+                    flex:1,padding:"8px",borderRadius:"10px",border:"1px solid",
+                    borderColor:inputMode===m?"var(--accent-primary)":"var(--border-default)",
+                    background:inputMode===m?"var(--accent-primary)":"transparent",
+                    color:inputMode===m?"var(--text-on-accent)":"var(--text-secondary)",
+                    fontFamily:"var(--font-body)",fontSize:"13px",fontWeight:inputMode===m?600:400,cursor:"pointer",
+                    display:"flex",alignItems:"center",justifyContent:"center",gap:"6px",
+                  }}>
+                    {m==="visual"?"🎨 Visual":"{ } JSON / Code"}
+                  </button>
+                ))}
+              </div>
+
+              {/* JSON input panel */}
+              {inputMode==="json" && (
+                <div style={{background:"var(--bg-surface)",border:"1px solid var(--border-default)",borderRadius:"14px",padding:"16px"}}>
+                  <p style={{fontFamily:"var(--font-body)",fontSize:"12px",color:"var(--text-muted)",margin:"0 0 8px"}}>
+                    วาง JSON ของ theme (full Theme object หรือแค่ colors object ก็ได้)
+                  </p>
+                  <textarea value={jsonText} onChange={e=>setJsonText(e.target.value)}
+                    rows={18} spellCheck={false}
+                    style={{width:"100%",padding:"12px",borderRadius:"10px",
+                      border:`1px solid ${jsonError?"var(--color-danger)":"var(--border-default)"}`,
+                      background:"var(--bg-elevated)",color:"var(--text-primary)",
+                      fontFamily:"monospace",fontSize:"12px",outline:"none",
+                      boxSizing:"border-box",resize:"vertical",lineHeight:1.5,
+                    }}/>
+                  {jsonError && <p style={{fontFamily:"var(--font-body)",fontSize:"12px",color:"var(--color-danger)",margin:"6px 0 0"}}>{jsonError}</p>}
+                  <div style={{display:"flex",gap:"8px",marginTop:"10px"}}>
+                    <button onClick={()=>setInputMode("visual")} style={{flex:1,padding:"9px",borderRadius:"9px",border:"1px solid var(--border-default)",background:"transparent",color:"var(--text-secondary)",fontFamily:"var(--font-body)",fontSize:"13px",cursor:"pointer"}}>ยกเลิก</button>
+                    <button onClick={applyJson} style={{flex:2,padding:"9px",borderRadius:"9px",border:"none",background:"var(--accent-primary)",color:"var(--text-on-accent)",fontFamily:"var(--font-body)",fontSize:"13px",fontWeight:700,cursor:"pointer"}}>✓ นำเข้า JSON</button>
+                  </div>
+                </div>
+              )}
+
+              {inputMode==="visual" && <>
 
               {/* Basic */}
               <div style={{background:"var(--bg-surface)",border:"1px solid var(--border-default)",borderRadius:"16px",padding:"18px"}}>
@@ -294,16 +373,26 @@ export default function ThemeEditorPage() {
                   ))}
                 </div>
               </div>
+
+              </>
+              }
             </div>
 
             {/* Right: preview sticky */}
             <div style={{position:"sticky",top:"80px",display:"flex",flexDirection:"column",gap:"12px"}}>
               <PreviewCard t={editing}/>
-              <motion.button whileHover={{scale:1.02}} whileTap={{scale:0.97}} onClick={previewNow}
+              <motion.button whileHover={{scale:1.02}} whileTap={{scale:0.97}} onClick={isPreviewing ? unpreview : previewNow}
                 style={{width:"100%",padding:"11px",borderRadius:"12px",border:"1px solid var(--accent-primary)",
                   background:"transparent",color:"var(--accent-primary)",fontFamily:"var(--font-body)",fontSize:"14px",fontWeight:600,cursor:"pointer"}}>
-                👁️ Preview ทันที
+                {isPreviewing ? "🙈 Unpreview" : "👁️ Preview ทันที"}
               </motion.button>
+              {isPreviewing && (
+                <motion.button whileHover={{scale:1.02}} whileTap={{scale:0.97}} onClick={unpreview}
+                  style={{width:"100%",padding:"11px",borderRadius:"12px",border:"1px solid var(--border-default)",
+                    background:"transparent",color:"var(--text-secondary)",fontFamily:"var(--font-body)",fontSize:"13px",cursor:"pointer"}}>
+                  🔄 Restore Current Theme
+                </motion.button>
+              )}
               <motion.button whileHover={{scale:1.02}} whileTap={{scale:0.97}} onClick={saveTheme}
                 style={{width:"100%",padding:"14px",borderRadius:"12px",border:"none",
                   background:"var(--accent-primary)",color:"var(--text-on-accent)",
@@ -315,7 +404,7 @@ export default function ThemeEditorPage() {
                 บันทึกใน localStorage — ใช้ได้ทันที ไม่ต้องแก้โค้ด
               </p>
             </div>
-          </div>
+          </div> /* <-- THIS WAS THE MISSING CLOSING DIV */
         )}
 
         {tab==="manage" && (

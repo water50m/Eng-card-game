@@ -182,6 +182,40 @@ export default function AdminVocabPage() {
       </AnimatePresence>
 
       <main style={{maxWidth:"1000px",margin:"0 auto",padding:"24px 16px"}}>
+
+      {/* Difficulty & Category reference */}
+      <details style={{marginBottom:"20px",background:"var(--bg-surface)",border:"1px solid var(--border-default)",borderRadius:"14px",padding:"14px 18px"}}>
+        <summary style={{fontFamily:"var(--font-body)",fontSize:"14px",fontWeight:600,color:"var(--text-primary)",cursor:"pointer",userSelect:"none"}}>
+          📋 ระดับความยาก & หมวดหมู่ที่มี (คลิกเพื่อดู)
+        </summary>
+        <div style={{marginTop:"14px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px"}}>
+          <div>
+            <p style={{fontFamily:"var(--font-body)",fontSize:"12px",color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 8px"}}>ระดับความยาก</p>
+            {[
+              {v:1,label:"Beginner",color:"#4CAF50",desc:"คำพื้นฐาน ง่ายมาก"},
+              {v:2,label:"Easy",    color:"#8BC34A",desc:"ง่าย ใช้บ่อย"},
+              {v:3,label:"Medium",  color:"#FFC107",desc:"กลาง ใช้ทั่วไป"},
+              {v:4,label:"Hard",    color:"#FF5722",desc:"ยาก ไม่ค่อยพบ"},
+              {v:5,label:"Expert",  color:"#9C27B0",desc:"ยากมาก เฉพาะทาง"},
+            ].map(d=>(
+              <div key={d.v} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"5px"}}>
+                <span style={{fontFamily:"var(--font-mono)",fontWeight:700,fontSize:"13px",color:d.color,minWidth:"18px"}}>{d.v}</span>
+                <span style={{fontFamily:"var(--font-body)",fontSize:"13px",color:"var(--text-primary)",minWidth:"70px"}}>{d.label}</span>
+                <span style={{fontFamily:"var(--font-body)",fontSize:"12px",color:"var(--text-muted)"}}>{d.desc}</span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <p style={{fontFamily:"var(--font-body)",fontSize:"12px",color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 8px"}}>หมวดหมู่ (category)</p>
+            {["animals","food","colors","numbers","verbs","adjectives","places","daily-life","engineering","custom"].map(c=>(
+              <div key={c} style={{fontFamily:"var(--font-mono)",fontSize:"12px",color:"var(--text-secondary)",marginBottom:"4px",display:"flex",alignItems:"center",gap:"6px"}}>
+                <code style={{background:"var(--bg-subtle)",padding:"1px 6px",borderRadius:"4px",color:"var(--accent-primary)"}}>{c}</code>
+              </div>
+            ))}
+          </div>
+        </div>
+      </details>
+
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"20px",flexWrap:"wrap",gap:"12px"}}>
           <div>
             <h1 style={{fontFamily:"var(--font-display)",fontSize:"26px",fontWeight:700,color:"var(--text-primary)",margin:"0 0 4px",letterSpacing:"-0.02em"}}>📚 จัดการคำศัพท์</h1>

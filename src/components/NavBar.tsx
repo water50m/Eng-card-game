@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
 import { ThemePicker } from "./ThemePicker"
+import { FontSizeWidget } from "./FontSizeWidget"
 import { useAuth } from "../hooks/useAuth"
 
 const NAV = [
@@ -69,6 +70,7 @@ export function NavBar() {
               {user.emoji} {user.name}
             </button>
           )}
+          <FontSizeWidget compact/>
           <ThemePicker/>
         </div>
       </header>

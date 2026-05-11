@@ -29,11 +29,16 @@ function getMockProgress() {
     ],
     masteredWords: SEED_VOCABULARY.slice(0, 14),
     recentActivity: [
-      { word: "elephant",  correct: true,  time: "2m ago" },
-      { word: "harvest",   correct: false, time: "3m ago" },
-      { word: "turquoise", correct: true,  time: "5m ago" },
-      { word: "dolphin",   correct: true,  time: "8m ago" },
-      { word: "peculiar",  correct: true,  time: "12m ago" },
+      { word: "elephant",  correct: true,  time: "2m ago",   thai: "ช้าง" },
+      { word: "harvest",   correct: false, time: "3m ago",   thai: "เก็บเกี่ยว" },
+      { word: "turquoise", correct: true,  time: "5m ago",   thai: "สีฟ้าเขียว" },
+      { word: "dolphin",   correct: true,  time: "8m ago",   thai: "โลมา" },
+      { word: "peculiar",  correct: true,  time: "12m ago",  thai: "แปลกประหลาด" },
+      { word: "crimson",   correct: false, time: "18m ago",  thai: "สีแดงเลือดหมู" },
+      { word: "wander",    correct: true,  time: "25m ago",  thai: "เดินเตร็ดเตร่" },
+      { word: "fragile",   correct: true,  time: "32m ago",  thai: "เปราะบาง" },
+      { word: "giraffe",   correct: false, time: "45m ago",  thai: "ยีราฟ" },
+      { word: "ancient",   correct: true,  time: "1h ago",   thai: "โบราณ" },
     ],
     categoryBreakdown: [
       { cat: "animals",    mastered: 5, total: 8 },
@@ -82,6 +87,7 @@ function BarChart({ data }: { data: { day: string; correct: number; wrong: numbe
 export default function DashboardPage() {
   const { user, ready } = useAuth()
   const data = getMockProgress()
+  const [showAllActivity, setShowAllActivity] = useState(false)
 
   const statCards = [
     { label: "Words Mastered",  value: data.wordsMastered,  color: "var(--mastered-color)", icon: "⭐" },
@@ -245,23 +251,39 @@ export default function DashboardPage() {
             Recent Activity
           </h2>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {data.recentActivity.map((a, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 0", borderBottom: i < data.recentActivity.length - 1 ? "1px solid var(--border-default)" : "none" }}>
+            {(showAllActivity ? data.recentActivity : data.recentActivity.slice(0,5)).map((a, i, arr) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 0", borderBottom: i < arr.length - 1 ? "1px solid var(--border-default)" : "none" }}>
                 <div style={{
                   width: "28px", height: "28px", borderRadius: "50%", flexShrink: 0,
                   background: a.correct ? "var(--color-success-bg)" : "var(--color-danger-bg)",
+                  color: a.correct ? "var(--color-success)" : "var(--color-danger)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "14px",
+                  fontSize: "14px", fontWeight: 700,
                 }}>
                   {a.correct ? "✓" : "✗"}
                 </div>
                 <div style={{ flex: 1 }}>
                   <span style={{ fontFamily: "var(--font-body)", fontSize: "14px", fontWeight: 500, color: "var(--text-primary)" }}>{a.word}</span>
+                  {(a as any).thai && <span style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: "var(--text-muted)", marginLeft: "8px" }}>{(a as any).thai}</span>}
                 </div>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: "var(--text-muted)" }}>{a.time}</span>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: "var(--text-muted)", flexShrink: 0 }}>{a.time}</span>
               </div>
             ))}
           </div>
+          {data.recentActivity.length > 5 && (
+            <motion.button
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+              onClick={() => setShowAllActivity(v => !v)}
+              style={{
+                width: "100%", marginTop: "12px", padding: "9px",
+                borderRadius: "10px", border: "1px solid var(--border-default)",
+                background: "transparent", color: "var(--accent-primary)",
+                fontFamily: "var(--font-body)", fontSize: "13px", fontWeight: 600,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+              }}>
+              {showAllActivity ? "▲ ย่อ" : `▼ ดูเพิ่มเติม (${data.recentActivity.length - 5} รายการ)`}
+            </motion.button>
+          )}
         </motion.div>
       </main>
     </div>

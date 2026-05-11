@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { useState } from "react"
 import { useTheme } from "../themes/ThemeProvider"
+import { FontSizeWidget } from "./FontSizeWidget"
 
 export function ThemePicker() {
   const { theme, allThemes, setTheme } = useTheme()
@@ -68,6 +69,11 @@ export function ThemePicker() {
                 </>
               )}
 
+              {/* Font size */}
+              <div style={{height:"1px",background:"var(--border-default)",margin:"6px 8px"}}/>
+              <div style={{padding:"8px 10px"}}>
+                <FontSizeWidget/>
+              </div>
               {/* Link to editor */}
               <div style={{height:"1px",background:"var(--border-default)",margin:"6px 8px"}}/>
               <a href="/theme-editor" onClick={()=>setOpen(false)} style={{

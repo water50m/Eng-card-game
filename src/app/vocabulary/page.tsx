@@ -251,19 +251,38 @@ export default function VocabularyPage() {
           </motion.button>
         </div>
 
-        {/* Search */}
-        <input
-          type="search"
-          placeholder="🔍  ค้นหาคำศัพท์..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{
-            width: "100%", padding: "12px 16px", borderRadius: "12px",
-            border: "1px solid var(--border-default)", background: "var(--bg-surface)",
-            color: "var(--text-primary)", fontFamily: "var(--font-body)", fontSize: "15px",
-            outline: "none", boxSizing: "border-box", marginBottom: "14px",
-          }}
-        />
+        {/* Search — icon stays, cursor after icon */}
+        <div style={{position:"relative",marginBottom:"14px"}}>
+          <svg style={{position:"absolute",left:"14px",top:"50%",transform:"translateY(-50%)",
+            color:"var(--text-muted)",pointerEvents:"none",flexShrink:0}}
+            width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input
+            type="text"
+            placeholder="ค้นหาคำศัพท์..."
+            value={search}
+            onChange={e => {
+              setSearch(e.target.value)
+              // clear stale filtered state when empty
+              if (!e.target.value) setSearch("")
+            }}
+            style={{
+              width:"100%",padding:"12px 16px 12px 40px",borderRadius:"12px",
+              border:"1px solid var(--border-default)",background:"var(--bg-surface)",
+              color:"var(--text-primary)",fontFamily:"var(--font-body)",fontSize:"15px",
+              outline:"none",boxSizing:"border-box" as const,
+            }}
+          />
+          {search && (
+            <button onClick={()=>setSearch("")}
+              style={{position:"absolute",right:"12px",top:"50%",transform:"translateY(-50%)",
+                background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",
+                fontFamily:"var(--font-body)",fontSize:"16px",padding:"2px 6px",lineHeight:1}}>
+              ✕
+            </button>
+          )}
+        </div>
 
         {/* Filters */}
         <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "4px", marginBottom: "20px" }}>
