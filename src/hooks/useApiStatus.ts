@@ -7,7 +7,7 @@ export interface ApiEndpoint {
   name:     string
   url:      string
   method:   "GET" | "POST"
-  category: "backend" | "dict" | "translation" | "tts"
+  category: "database" | "dict" | "translation" | "tts"
   testPayload?: object
 }
 
@@ -16,16 +16,26 @@ export interface ApiStatus {
   status:  "ok" | "error" | "checking" | "unknown"
   latency: number | null   // ms
   lastChecked: Date | null
+  detail?: string
   error?:  string
+}
+
+type HealthResponse = {
+  database?: {
+    ok?: boolean
+    name?: string | null
+    user?: string | null
+    error?: string
+  }
 }
 
 export const API_ENDPOINTS: ApiEndpoint[] = [
   {
-    id:       "backend-health",
-    name:     "Backend API",
-    url:      "http://localhost:3000/api/health",
+    id:       "database-health",
+    name:     "App / Database",
+    url:      "/api/health",
     method:   "GET",
-    category: "backend",
+    category: "database",
   },
   {
     id:       "mymemory",
@@ -54,64 +64,77 @@ export function useApiStatus(autoCheck = false) {
   const [statuses, setStatuses] = useState<Record<string, ApiStatus>>({})
   const [checking, setChecking] = useState(false)
 
+  const checkEndpoint = useCallback(async (ep: ApiEndpoint): Promise<ApiStatus> => {
+    const start = Date.now()
+
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("ecg-token") : null
+      const headers = ep.url.startsWith("/") && token
+        ? { Authorization: `Bearer ${token}` }
+        : undefined
+      const res = await fetch(ep.url, {
+        method: ep.method,
+        headers,
+        signal: AbortSignal.timeout(5000),
+      })
+      const latency = Date.now() - start
+      let detail: string | undefined
+      let error = res.ok ? undefined : `HTTP ${res.status}`
+
+      if (ep.id === "database-health") {
+        const data = await res.json().catch(() => null) as HealthResponse | null
+        if (data?.database) {
+          const dbName = data.database.name ?? "unknown"
+          const dbUser = data.database.user ? ` (${data.database.user})` : ""
+          detail = `DB: ${dbName}${dbUser}`
+          error = data.database.ok === false
+            ? data.database.error || error || "Database error"
+            : error
+        }
+      }
+
+      return {
+        id: ep.id,
+        status: res.ok ? "ok" : "error",
+        latency,
+        lastChecked: new Date(),
+        detail,
+        error,
+      }
+    } catch(e: unknown) {
+      const message = e instanceof Error ? e.message : ""
+      return {
+        id: ep.id,
+        status: "error",
+        latency: null,
+        lastChecked: new Date(),
+        error: message.includes("timeout") ? "Timeout" : "Unreachable",
+      }
+    }
+  }, [])
+
   const checkAll = useCallback(async () => {
     setChecking(true)
     const results: Record<string, ApiStatus> = {}
 
     await Promise.all(API_ENDPOINTS.map(async ep => {
-      const start = Date.now()
       results[ep.id] = { id:ep.id, status:"checking", latency:null, lastChecked:null }
       setStatuses(prev => ({ ...prev, [ep.id]: results[ep.id] }))
 
-      try {
-        const res = await fetch(ep.url, {
-          method: ep.method,
-          signal: AbortSignal.timeout(5000),
-        })
-        const latency = Date.now() - start
-        results[ep.id] = {
-          id: ep.id,
-          status: res.ok ? "ok" : "error",
-          latency,
-          lastChecked: new Date(),
-          error: res.ok ? undefined : `HTTP ${res.status}`,
-        }
-      } catch(e: unknown) {
-        const message = e instanceof Error ? e.message : ""
-        results[ep.id] = {
-          id: ep.id,
-          status: "error",
-          latency: null,
-          lastChecked: new Date(),
-          error: message.includes("timeout") ? "Timeout" : "Unreachable",
-        }
-      }
+      results[ep.id] = await checkEndpoint(ep)
       setStatuses(prev => ({ ...prev, [ep.id]: results[ep.id] }))
     }))
 
     setChecking(false)
-  }, [])
+  }, [checkEndpoint])
 
   const checkOne = useCallback(async (epId: string) => {
     const ep = API_ENDPOINTS.find(e => e.id === epId)
     if (!ep) return
     setStatuses(prev => ({ ...prev, [ep.id]: { id:ep.id, status:"checking", latency:null, lastChecked:null } }))
-    const start = Date.now()
-    try {
-      const res = await fetch(ep.url, { signal: AbortSignal.timeout(5000) })
-      setStatuses(prev => ({ ...prev, [ep.id]: {
-        id:ep.id, status:res.ok?"ok":"error",
-        latency:Date.now()-start, lastChecked:new Date(),
-        error:res.ok?undefined:`HTTP ${res.status}`,
-      }}))
-    } catch(e: unknown) {
-      const message = e instanceof Error ? e.message : ""
-      setStatuses(prev => ({ ...prev, [ep.id]: {
-        id:ep.id, status:"error", latency:null, lastChecked:new Date(),
-        error:message.includes("timeout")?"Timeout":"Unreachable",
-      }}))
-    }
-  }, [])
+    const result = await checkEndpoint(ep)
+    setStatuses(prev => ({ ...prev, [ep.id]: result }))
+  }, [checkEndpoint])
 
   useEffect(() => {
     if (!autoCheck) return

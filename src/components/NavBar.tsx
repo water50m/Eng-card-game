@@ -24,7 +24,7 @@ const ADMIN_NAV = [
 
 export function NavBar() {
   const pathname = usePathname()
-  const { user, logout } = useAuth(false)
+  const { user, ready, logout } = useAuth(false)
   const allNav = user?.isAdmin ? [...NAV, ...ADMIN_NAV] : NAV
 
   return (
@@ -61,7 +61,7 @@ export function NavBar() {
         </nav>
 
         <div style={{display:"flex",alignItems:"center",gap:"10px",flexShrink:0}}>
-          {user && (
+          {user ? (
             <button onClick={logout} title="Logout" style={{
               display:"flex",alignItems:"center",gap:"5px",padding:"5px 10px",
               borderRadius:"9999px",border:"1px solid var(--border-default)",
@@ -70,8 +70,18 @@ export function NavBar() {
             }}>
               {user.emoji} {user.name}
             </button>
-          )}
-          <ApiStatusPanel/>
+          ) : ready ? (
+            <Link href="/login" style={{
+              display:"flex",alignItems:"center",gap:"5px",padding:"5px 10px",
+              borderRadius:"9999px",border:"1px solid var(--border-default)",
+              background:"var(--bg-subtle)",color:"var(--accent-primary)",
+              fontFamily:"var(--font-body)",fontSize:"12px",fontWeight:600,
+              textDecoration:"none",whiteSpace:"nowrap",
+            }}>
+              🔐 Login
+            </Link>
+          ) : null}
+          {user?.isAdmin && <ApiStatusPanel/>}
           <FontSizeWidget compact/>
           <ThemePicker/>
         </div>

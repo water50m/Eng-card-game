@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useApiStatus, API_ENDPOINTS } from "../hooks/useApiStatus"
 
 const CAT_LABEL: Record<string,string> = {
-  backend:"Backend", dict:"Dictionary", translation:"Translation", tts:"Text-to-Speech",
+  database:"App / Database", dict:"Dictionary", translation:"Translation", tts:"Text-to-Speech",
 }
 const CAT_ICON: Record<string,string> = {
-  backend:"🖥️", dict:"📚", translation:"🌐", tts:"🔊",
+  database:"🗄️", dict:"📚", translation:"🌐", tts:"🔊",
 }
 
 export function ApiStatusPanel() {
@@ -66,7 +66,7 @@ export function ApiStatusPanel() {
               {/* Header */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
                 <span style={{fontFamily:"var(--font-display)",fontSize:"14px",fontWeight:700,color:"var(--text-primary)"}}>
-                  🔌 API Status
+                  🔌 API / Database Status
                 </span>
                 <motion.button whileHover={{scale:1.05}} whileTap={{scale:0.95}}
                   onClick={checkAll} disabled={checking}
@@ -80,7 +80,7 @@ export function ApiStatusPanel() {
               </div>
 
               {/* Endpoints by category */}
-              {(["backend","dict","translation","tts"] as const).map(cat => {
+              {(["database","dict","translation","tts"] as const).map(cat => {
                 const eps = API_ENDPOINTS.filter(e=>e.category===cat)
                 if(!eps.length) return null
                 return (
@@ -108,6 +108,10 @@ export function ApiStatusPanel() {
                           <div style={{flex:1}}>
                             <p style={{fontFamily:"var(--font-body)",fontSize:"12px",fontWeight:500,
                               color:"var(--text-primary)",margin:0}}>{ep.name}</p>
+                            {s?.detail && (
+                              <p style={{fontFamily:"var(--font-body)",fontSize:"10px",
+                                color:"var(--text-muted)",margin:0}}>{s.detail}</p>
+                            )}
                             {s?.error && (
                               <p style={{fontFamily:"var(--font-body)",fontSize:"10px",
                                 color:"var(--color-danger)",margin:0}}>{s.error}</p>
