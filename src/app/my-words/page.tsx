@@ -1,6 +1,6 @@
 // english-card-game/src/app/my-words/page.tsx
 "use client"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect} from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { NavBar } from "../../components/NavBar"
 import { useAuth } from "../../hooks/useAuth"
@@ -116,16 +116,53 @@ function PersonalStats({ words }:{ words:VocabWord[] }) {
 
 export default function MyWordsPage() {
   const { user, ready } = useAuth()
-  const [words,setWords]       = useState<VocabWord[]>(DEFAULT_WORDS)
+  const userId = user ? btoa(user.name).replace(/=/g,"") : "guest"
+
+  type ShowMode = "all" | "sometimes" | "personal-only"
+
+  const [words,setWords]       = useState<VocabWord[]>([])
   const [adding,setAdding]     = useState(false)
   const [editId,setEditId]     = useState<string|null>(null)
   const [search,setSearch]     = useState("")
   const [filterShow,setFilterShow] = useState<"all"|ShowMode>("all")
   const [toast,setToast]       = useState("")
+  const [rateDenied,setRateDenied] = useState(false)
+  const [rateRemaining,setRateRemaining] = useState(20)
 
-  type ShowMode = "all" | "sometimes" | "personal-only"
+  // Load per-user words from localStorage on mount
+  useEffect(()=>{
+    if(!ready) return
+    try {
+      const saved = localStorage.getItem(`ecg-user-words-${userId}`)
+      if(saved) setWords(JSON.parse(saved))
+    } catch {}
+    // Show rate info
+    const log:number[] = JSON.parse(localStorage.getItem(`ecg-rate-${userId}`)??"[]")
+    const now = Date.now()
+    const recent = log.filter(t=>now-t < 3600000)
+    setRateRemaining(Math.max(0, 20 - recent.length))
+  },[ready, userId])
 
   function toast2(msg:string){ setToast(msg); setTimeout(()=>setToast(""),2500) }
+
+  function checkRateLimit(): boolean {
+    const now = Date.now()
+    const log:number[] = JSON.parse(localStorage.getItem(`ecg-rate-${userId}`)??"[]")
+    const recent = log.filter(t=>now-t < 3600000)
+    if(recent.length >= 20){
+      setRateDenied(true)
+      setTimeout(()=>setRateDenied(false), 5000)
+      return false
+    }
+    localStorage.setItem(`ecg-rate-${userId}`, JSON.stringify([...recent, now]))
+    setRateRemaining(Math.max(0, 19 - recent.length))
+    return true
+  }
+
+  function persistWords(updated: VocabWord[]) {
+    setWords(updated)
+    localStorage.setItem(`ecg-user-words-${userId}`, JSON.stringify(updated))
+  }
 
   const filtered = useMemo(()=>words.filter(w=>{
     const ms = !search||(w.english.toLowerCase().includes(search.toLowerCase())||w.thai.includes(search))
@@ -133,6 +170,11 @@ export default function MyWordsPage() {
   }),[words,search])
 
   function saveWord(w:VocabWord, show:string){
+    // Rate limit check for NEW words only
+    if(!editId && !checkRateLimit()){
+      toast2("⚠️ เพิ่มคำได้สูงสุด 20 คำต่อชั่วโมง กรุณารอสักครู่")
+      return
+    }
     setWords(prev=>editId ? prev.map(x=>x.id===editId?w:x) : [...prev,w])
     setAdding(false); setEditId(null)
     toast2(editId?"แก้ไขแล้ว ✓":"เพิ่มคำใหม่แล้ว ✓")

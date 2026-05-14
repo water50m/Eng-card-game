@@ -34,6 +34,7 @@ export function ConfettiCanvas({ active }: { active: boolean }) {
     canvas.width  = window.innerWidth
     canvas.height = window.innerHeight
     const ctx = canvas.getContext("2d")!
+    const activeCanvas = canvas
 
     // Spawn particles from center-top
     const cx = canvas.width / 2
@@ -52,7 +53,7 @@ export function ConfettiCanvas({ active }: { active: boolean }) {
     }
 
     function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.clearRect(0, 0, activeCanvas.width, activeCanvas.height)
       particles.current = particles.current.filter(p => p.alpha > 0.01)
 
       for (const p of particles.current) {

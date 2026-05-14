@@ -46,21 +46,38 @@ export default function LoginPage() {
 
   async function submitPin(p: string) {
     setLoading(true)
-    // Simulate API call — in production call POST /api/auth/pin
-    await new Promise(r => setTimeout(r, 600))
-
-    const user = DEMO_USERS.find(u => u.pin === p)
-    if (user) {
-      // Store mock token + user
-      const fakeToken = btoa(JSON.stringify({ userId: p, name: user.name, isAdmin: p === "00000" }))
-      localStorage.setItem("ecg-token", fakeToken)
-      localStorage.setItem("ecg-user", JSON.stringify({ name: user.name, emoji: user.emoji, isAdmin: p === "00000" }))
-      setSuccess(true)
-      setTimeout(() => router.push("/game"), 700)
-    } else {
+    
+    try {
+      const response = await fetch('/api/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: p })
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok) {
+        // Store real JWT token + user data
+        localStorage.setItem("ecg-token", data.token)
+        localStorage.setItem("ecg-user", JSON.stringify({ 
+          id: data.user.id,
+          name: data.user.name, 
+          emoji: data.user.emoji, 
+          isAdmin: data.user.isAdmin 
+        }))
+        setSuccess(true)
+        setTimeout(() => router.push("/game"), 700)
+      } else {
+        setLoading(false)
+        setShake(true)
+        setError(data.error || "PIN ไม่ถูกต้อง ลองใหม่อีกครั้ง")
+        setPin("")
+        setTimeout(() => setShake(false), 600)
+      }
+    } catch (error) {
       setLoading(false)
       setShake(true)
-      setError("PIN ไม่ถูกต้อง ลองใหม่อีกครั้ง")
+      setError("เกิดข้อผิดพลาด ลองใหม่อีกครั้ง")
       setPin("")
       setTimeout(() => setShake(false), 600)
     }

@@ -1,7 +1,19 @@
 // english-card-game/src/lib/api.ts
 // src/lib/api.ts — Frontend API client
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+import type { VocabWord } from "@/types/game"
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+
+type AuthUser = { id: string; name: string; emoji: string; isAdmin: boolean }
+type DashboardData = Record<string, unknown>
+type ProgressData = Record<string, unknown>
+type MasteredWord = Record<string, unknown>
+type LeaderboardEntry = Record<string, unknown>
+type Achievement = Record<string, unknown>
+type AdminUser = Record<string, unknown>
+type AdminStats = Record<string, unknown>
+type AdminSetting = Record<string, string>
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null
@@ -34,7 +46,7 @@ async function request<T>(
 export const api = {
   auth: {
     login: (pin: string) =>
-      request<{ token: string; user: { id: string; name: string; emoji: string; isAdmin: boolean } }>(
+      request<{ token: string; user: AuthUser }>(
         "/api/auth/pin", { method: "POST", body: JSON.stringify({ pin }) }
       ),
     verify: () =>
@@ -48,7 +60,7 @@ export const api = {
       if (params?.category) qs.set("category", params.category)
       if (params?.difficulty) qs.set("difficulty", params.difficulty)
       if (params?.excludeIds?.length) qs.set("excludeIds", params.excludeIds.join(","))
-      return request<{ word: any; options: string[] }>(`/api/game/vocabulary/random?${qs}`)
+      return request<{ word: VocabWord; options: string[] }>(`/api/game/vocabulary/random?${qs}`)
     },
     themes: () => request<{ category: string; count: number }[]>("/api/game/vocabulary/themes"),
     submitAnswer: (body: { wordId: string; correct: boolean; timeMs: number; sessionId?: string }) =>
@@ -63,9 +75,9 @@ export const api = {
 
   // ── User ──────────────────────────────────────────────────
   user: {
-    dashboard: () => request<any>("/api/user/dashboard"),
-    progress:  () => request<any[]>("/api/user/progress"),
-    mastered:  () => request<any[]>("/api/user/mastered"),
+    dashboard: () => request<DashboardData>("/api/user/dashboard"),
+    progress:  () => request<ProgressData[]>("/api/user/progress"),
+    mastered:  () => request<MasteredWord[]>("/api/user/mastered"),
   },
 
   // ── Vocabulary ────────────────────────────────────────────
@@ -75,36 +87,36 @@ export const api = {
       if (params?.category)   qs.set("category", params.category)
       if (params?.difficulty) qs.set("difficulty", params.difficulty)
       if (params?.search)     qs.set("search", params.search)
-      return request<any[]>(`/api/vocabulary?${qs}`)
+      return request<VocabWord[]>(`/api/vocabulary?${qs}`)
     },
     add: (word: { english: string; thai: string; phonetic?: string; example?: string; category?: string; difficulty?: number }) =>
-      request<any>("/api/vocabulary", { method: "POST", body: JSON.stringify(word) }),
+      request<VocabWord>("/api/vocabulary", { method: "POST", body: JSON.stringify(word) }),
     delete: (id: string) =>
       request(`/api/vocabulary/${id}`, { method: "DELETE" }),
   },
 
   // ── Leaderboard ───────────────────────────────────────────
   leaderboard: {
-    get: (limit = 20) => request<any[]>(`/api/leaderboard?limit=${limit}`),
+    get: (limit = 20) => request<LeaderboardEntry[]>(`/api/leaderboard?limit=${limit}`),
   },
 
   // ── Achievements ──────────────────────────────────────────
   achievements: {
-    list: () => request<any[]>("/api/achievements"),
+    list: () => request<Achievement[]>("/api/achievements"),
   },
 
   // ── Admin ─────────────────────────────────────────────────
   admin: {
-    getSettings: () => request<Record<string, string>>("/api/admin/settings"),
+    getSettings: () => request<AdminSetting>("/api/admin/settings"),
     updateSetting: (key: string, value: string) =>
       request("/api/admin/settings", { method: "PUT", body: JSON.stringify({ key, value }) }),
-    listUsers: () => request<any[]>("/api/admin/users"),
+    listUsers: () => request<AdminUser[]>("/api/admin/users"),
     createUser: (body: { displayName: string; pin: string; emoji?: string; isAdmin?: boolean }) =>
-      request<any>("/api/admin/users", { method: "POST", body: JSON.stringify(body) }),
+      request<AdminUser>("/api/admin/users", { method: "POST", body: JSON.stringify(body) }),
     deleteUser: (userId: string) =>
       request(`/api/admin/users/${userId}`, { method: "DELETE" }),
     seedVocabulary: () =>
       request("/api/admin/seed-vocabulary", { method: "POST" }),
-    stats: () => request<any>("/api/admin/stats"),
+    stats: () => request<AdminStats>("/api/admin/stats"),
   },
 }

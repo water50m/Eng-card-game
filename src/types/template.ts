@@ -54,3 +54,32 @@ export function saveUserTemplate(t: QuizTemplate): void {
 export function deleteUserTemplate(id: string): void {
   localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(loadUserTemplates().filter(x => x.id !== id)))
 }
+
+
+// ── Pin & Like storage ────────────────────────────────────────
+const PIN_KEY  = "ecg-template-pins"
+const LIKE_KEY = "ecg-template-likes"
+
+export function getPinnedIds(): string[] {
+  if (typeof window === "undefined") return []
+  try { return JSON.parse(localStorage.getItem(PIN_KEY) ?? "[]") } catch { return [] }
+}
+
+export function getLikedIds(): string[] {
+  if (typeof window === "undefined") return []
+  try { return JSON.parse(localStorage.getItem(LIKE_KEY) ?? "[]") } catch { return [] }
+}
+
+export function togglePin(id: string): string[] {
+  const current = getPinnedIds()
+  const next = current.includes(id) ? current.filter(x=>x!==id) : [...current, id]
+  localStorage.setItem(PIN_KEY, JSON.stringify(next))
+  return next
+}
+
+export function toggleLike(id: string): string[] {
+  const current = getLikedIds()
+  const next = current.includes(id) ? current.filter(x=>x!==id) : [...current, id]
+  localStorage.setItem(LIKE_KEY, JSON.stringify(next))
+  return next
+}

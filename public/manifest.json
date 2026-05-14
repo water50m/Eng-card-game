@@ -1,0 +1,15 @@
+{
+  "name": "English Card Game",
+  "short_name": "EnglishCard",
+  "description": "Master English vocabulary with flashcards",
+  "start_url": "/game",
+  "display": "standalone",
+  "background_color": "#0D0F1A",
+  "theme_color": "#0D0F1A",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/globe.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "categories": ["education", "games"],
+  "lang": "th"
+}

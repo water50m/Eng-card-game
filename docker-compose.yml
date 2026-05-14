@@ -22,30 +22,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Express API Backend ───────────────────────────────────
-  api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: ecg-api
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      NODE_ENV:     production
-      PORT:         4000
-      DATABASE_URL: postgresql://ecg_user:${DB_PASSWORD:-changeme}@db:5432/english_card_game
-      JWT_SECRET:   ${JWT_SECRET:-change-this-secret-in-production}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-    ports:
-      - "4000:4000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   # ── Next.js Frontend ──────────────────────────────────────
   web:
     build:
@@ -54,13 +30,15 @@ services:
     container_name: ecg-web
     restart: unless-stopped
     depends_on:
-      api:
+      db:
         condition: service_healthy
     environment:
       NODE_ENV:            production
-      NEXT_PUBLIC_API_URL: http://api:4000
+      DATABASE_URL:        postgresql://ecg_user:${DB_PASSWORD:-changeme}@db:5432/english_card_game
+      JWT_SECRET:          ${JWT_SECRET:-change-this-secret-in-production}
+      NEXT_PUBLIC_API_URL: http://localhost:3000
     ports:
-      - "3003:3000"
+      - "3000:3000"
 
 volumes:
   pgdata:

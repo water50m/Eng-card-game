@@ -1,11 +1,55 @@
 // english-card-game/src/app/admin-vocab/page.tsx
 "use client"
-import { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { NavBar } from "../../components/NavBar"
 import { useAuth } from "../../hooks/useAuth"
 import { SEED_VOCABULARY, CATEGORIES } from "../../data/vocabulary"
 import { VocabWord, Difficulty, QUIZ_CATEGORIES } from "../../types/game"
+
+
+// ── API Autocomplete helper ────────────────────────────────────
+async function fetchWordSuggestions(q: string): Promise<{word:string; def?:string}[]> {
+  if(!q || q.length < 2) return []
+  try {
+    // Datamuse: words similar/starting with query
+    const [datamuse, dictRes] = await Promise.allSettled([
+      fetch(`https://api.datamuse.com/words?sp=${encodeURIComponent(q+"*")}&md=d&max=6`).then(r=>r.json()),
+      fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(q)}`).then(r=>r.json()),
+    ])
+
+    const suggestions: {word:string; def?:string}[] = []
+
+    if(datamuse.status==="fulfilled" && Array.isArray(datamuse.value)){
+      datamuse.value.forEach((w:any) => {
+        suggestions.push({
+          word: w.word,
+          def: w.defs?.[0]?.replace(/^[a-z]	/,"") ?? undefined,
+        })
+      })
+    }
+    // If exact match found in dict API, put it first
+    if(dictRes.status==="fulfilled" && Array.isArray(dictRes.value)){
+      const exact = dictRes.value[0]
+      const def = exact?.meanings?.[0]?.definitions?.[0]?.definition
+      const existing = suggestions.findIndex(s=>s.word===q)
+      if(existing >= 0) suggestions[existing].def = def
+      else suggestions.unshift({ word:q, def })
+    }
+    return suggestions.slice(0, 8)
+  } catch { return [] }
+}
+
+async function fetchThaiTranslation(english: string): Promise<string> {
+  if(!english) return ""
+  try {
+    const res = await fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(english)}&langpair=en|th`
+    )
+    const data = await res.json()
+    return data?.responseData?.translatedText ?? ""
+  } catch { return "" }
+}
 
 const DIFF_LABEL: Record<Difficulty,string> = {1:"Beginner",2:"Easy",3:"Medium",4:"Hard",5:"Expert"}
 const DIFF_COLOR: Record<Difficulty,string> = {1:"var(--mastered-color)",2:"var(--accent-secondary)",3:"var(--color-warning)",4:"var(--color-danger)",5:"#A855F7"}
@@ -102,7 +146,50 @@ export default function AdminVocabPage() {
   const [jsonInput,setJsonInput] = useState(JSON_EXAMPLE)
   const [jsonPreview,setJsonPreview] = useState<VocabWord[]|null>(null)
   const [jsonError,setJsonError] = useState("")
+  const [csvMode,setCsvMode]     = useState(false)
+  const [csvFile,setCsvFile]     = useState<File|null>(null)
+  const [csvUploading,setCsvUploading] = useState(false)
+  const [csvProgress,setCsvProgress] = useState({current: 0, total: 0, message: ""})
   const [toast,setToast]         = useState("")
+
+  // Load custom words on component mount
+  useEffect(() => {
+    async function loadCustomWords() {
+      try {
+        const token = localStorage.getItem('ecg-token');
+        
+        if (!token) {
+          console.error('No token found - redirecting to login');
+          window.location.href = '/login';
+          return;
+        }
+        
+        const response = await fetch('/api/admin/vocabulary/custom', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const customWords = await response.json();
+          setWords(prev => [...prev, ...customWords]);
+        } else if (response.status === 401) {
+          console.error('Token expired or invalid - redirecting to login');
+          localStorage.removeItem('ecg-token');
+          window.location.href = '/login';
+        } else {
+          console.error('Failed to load custom words:', response.status, await response.text());
+        }
+      } catch (error) {
+        console.error('Failed to load custom words:', error);
+      }
+    }
+    
+    // Only load if user is ready and is admin
+    if (ready && user?.isAdmin) {
+      loadCustomWords();
+    }
+  }, [ready, user?.isAdmin]); // Remove 'user' dependency to prevent re-render loops
 
   function toast2(msg:string){ setToast(msg); setTimeout(()=>setToast(""),2500) }
 
@@ -113,14 +200,102 @@ export default function AdminVocabPage() {
     return ms&&mc&&md
   }),[words,search,catFilter,diffFilter])
 
-  function saveWord(w:VocabWord){
-    setWords(prev=>editingId
-      ? prev.map(x=>x.id===editingId?w:x)
-      : [...prev,w])
-    setEditingId(null); setAddingNew(false)
-    toast2(editingId?"แก้ไขแล้ว ✓":"เพิ่มคำใหม่แล้ว ✓")
+  async function saveWord(w:VocabWord){
+    try {
+      const token = localStorage.getItem('ecg-token');
+      
+      if (!token) {
+        toast2("กรุณาเข้าสู่ระบบใหม่");
+        window.location.href = '/login';
+        return;
+      }
+      
+      const isNew = !editingId;
+      
+      if (isNew) {
+        // เพิ่มคำใหม่
+        const response = await fetch('/api/admin/vocabulary/custom', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(w)
+        });
+        
+        if (response.ok) {
+          const savedWord = await response.json();
+          setWords(prev => [...prev, savedWord]);
+          setEditingId(null); 
+          setAddingNew(false);
+          toast2("เพิ่มคำใหม่แล้ว ✓");
+        } else if (response.status === 401) {
+          toast2("Token หมดอายุ กรุณาเข้าสู่ระบบใหม่");
+          localStorage.removeItem('ecg-token');
+          window.location.href = '/login';
+        } else {
+          toast2("เกิดข้อผิดพลาด");
+        }
+      } else {
+        // แก้ไขคำเดิม
+        const response = await fetch(`/api/admin/vocabulary/custom/${editingId}`, {
+          method: 'PUT',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(w)
+        });
+        
+        if (response.ok) {
+          const savedWord = await response.json();
+          setWords(prev => prev.map(x => x.id === editingId ? savedWord : x));
+          setEditingId(null); 
+          setAddingNew(false);
+          toast2("แก้ไขแล้ว ✓");
+        } else if (response.status === 401) {
+          toast2("Token หมดอายุ กรุณาเข้าสู่ระบบใหม่");
+          localStorage.removeItem('ecg-token');
+          window.location.href = '/login';
+        } else {
+          toast2("เกิดข้อผิดพลาด");
+        }
+      }
+    } catch (error) {
+      toast2("เกิดข้อผิดพลาด");
+    }
   }
-  function deleteWord(id:string){ setWords(prev=>prev.filter(w=>w.id!==id)); toast2("ลบแล้ว") }
+  async function deleteWord(id:string){ 
+    try {
+      const token = localStorage.getItem('ecg-token');
+      
+      if (!token) {
+        toast2("กรุณาเข้าสู่ระบบใหม่");
+        window.location.href = '/login';
+        return;
+      }
+      
+      const response = await fetch(`/api/admin/vocabulary/custom/${id}`, {
+        method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        setWords(prev=>prev.filter(w=>w.id!==id)); 
+        toast2("ลบแล้ว");
+      } else if (response.status === 401) {
+        toast2("Token หมดอายุ กรุณาเข้าสู่ระบบใหม่");
+        localStorage.removeItem('ecg-token');
+        window.location.href = '/login';
+      } else {
+        toast2("เกิดข้อผิดพลาด");
+      }
+    } catch (error) {
+      toast2("เกิดข้อผิดพลาด");
+    }
+  }
 
   function parseJson(){
     try{
@@ -142,11 +317,190 @@ export default function AdminVocabPage() {
     }catch(e:any){ setJsonError(String(e.message)) }
   }
 
-  function confirmJsonImport(){
+  async function confirmJsonImport(){
     if(!jsonPreview)return
-    setWords(prev=>[...prev,...jsonPreview])
-    setJsonPreview(null); setJsonInput(JSON_EXAMPLE); setJsonMode(false)
-    toast2(`เพิ่ม ${jsonPreview.length} คำแล้ว ✓`)
+    
+    try {
+      const token = localStorage.getItem('ecg-token');
+      
+      if (!token) {
+        toast2("กรุณาเข้าสู่ระบบใหม่");
+        window.location.href = '/login';
+        return;
+      }
+      
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const word of jsonPreview) {
+        try {
+          const response = await fetch('/api/admin/vocabulary/custom', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(word)
+          });
+          
+          if (response.ok) {
+            const savedWord = await response.json();
+            setWords(prev => [...prev, savedWord]);
+            successCount++;
+          } else if (response.status === 401) {
+            toast2("Token หมดอายุ กรุณาเข้าสู่ระบบใหม่");
+            localStorage.removeItem('ecg-token');
+            window.location.href = '/login';
+            return;
+          } else {
+            errorCount++;
+          }
+        } catch (error) {
+          errorCount++;
+        }
+      }
+      
+      setJsonPreview(null); 
+      setJsonInput(JSON_EXAMPLE); 
+      setJsonMode(false);
+      
+      if (errorCount === 0) {
+        toast2(`เพิ่ม ${successCount} คำแล้ว ✓`);
+      } else {
+        toast2(`เพิ่ม ${successCount} คำสำเร็จ ล้มเหลว ${errorCount} คำ`);
+      }
+    } catch (error) {
+      toast2("เกิดข้อผิดพลาด");
+    }
+  }
+
+  async function handleCsvUpload() {
+    if (!csvFile) {
+      toast2("กรุณาเลือกไฟล์ CSV");
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('ecg-token');
+      
+      if (!token) {
+        toast2("กรุณาเข้าสู่ระบบใหม่");
+        window.location.href = '/login';
+        return;
+      }
+      
+      console.log('🚀 CLIENT: Starting CSV import');
+      console.log(`📁 CLIENT: File selected: ${csvFile.name} (${csvFile.size} bytes)`);
+      
+      setCsvUploading(true);
+      setCsvProgress({current: 0, total: 0, message: "กำลังอ่านไฟล์..."});
+      
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', csvFile);
+      
+      console.log('📤 CLIENT: Sending request to /api/admin/vocabulary/csv-import');
+      
+      const uploadResponse = await fetch('/api/admin/vocabulary/csv-import', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        },
+        body: uploadFormData
+      });
+      
+      console.log(`📡 CLIENT: Response received - Status: ${uploadResponse.status}`);
+      console.log(`📡 CLIENT: Response headers:`, Object.fromEntries(uploadResponse.headers.entries()));
+      
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.json();
+        toast2(error.error || "เกิดข้อผิดพลาด");
+        return;
+      }
+      
+      // Handle streaming response
+      const reader = uploadResponse.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      if (!reader) {
+        toast2("ไม่สามารถอ่าน response ได้");
+        return;
+      }
+      
+      let result: any = null;
+      
+      console.log('📖 CLIENT: Starting to read stream...');
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log('📖 CLIENT: Stream reading completed');
+          break;
+        }
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              switch (data.type) {
+                case 'start':
+                  setCsvProgress({current: 0, total: data.total, message: data.message});
+                  console.log(`📥 CLIENT: Received start event - Total: ${data.total}`);
+                  break;
+                case 'progress':
+                  setCsvProgress({current: data.current, total: data.total, message: data.message});
+                  console.log(`📊 CLIENT: Received progress event - ${data.current}/${data.total}`);
+                  break;
+                case 'complete':
+                  result = data;
+                  setCsvProgress({current: data.total, total: data.total, message: "กำลังโหลดข้อมูล..."});
+                  console.log(`✅ CLIENT: Received complete event - Success: ${data.successCount}, Errors: ${data.errorCount}`);
+                  break;
+                case 'error':
+                  toast2(data.message || "เกิดข้อผิดพลาด");
+                  console.log(`❌ CLIENT: Received error event - ${data.message}`);
+                  return;
+              }
+            } catch (e) {
+              // Ignore JSON parse errors for partial chunks
+            }
+          }
+        }
+      }
+      
+      // Process completed successfully
+      if (result) {
+        // Reload custom words to get the latest data
+        const customResponse = await fetch('/api/admin/vocabulary/custom', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (customResponse.ok) {
+          const customWords = await customResponse.json();
+          setWords([...SEED_VOCABULARY, ...customWords]);
+        }
+        
+        if (result.errorCount === 0) {
+          toast2(`นำเข้า ${result.successCount} คำสำเร็จ ✓`);
+        } else {
+          toast2(`นำเข้า ${result.successCount} คำสำเร็จ ล้มเหลว ${result.errorCount} คำ`);
+        }
+        
+        setCsvFile(null);
+        setCsvMode(false);
+        setCsvProgress({current: 0, total: 0, message: ""});
+      }
+    } catch (error) {
+      toast2("เกิดข้อผิดพลาด");
+    } finally {
+      setCsvUploading(false);
+    }
   }
 
   if(!ready)return null
@@ -222,11 +576,15 @@ export default function AdminVocabPage() {
             <p style={{fontFamily:"var(--font-body)",fontSize:"14px",color:"var(--text-muted)",margin:0}}>{words.length} คำทั้งหมด · {filtered.length} ที่กรอง</p>
           </div>
           <div style={{display:"flex",gap:"8px"}}>
-            <motion.button whileHover={{scale:1.03}} whileTap={{scale:0.97}} onClick={()=>{setJsonMode(true);setAddingNew(false);setEditingId(null)}}
+            <motion.button whileHover={{scale:1.03}} whileTap={{scale:0.97}} onClick={()=>{setCsvMode(true);setAddingNew(false);setEditingId(null);setJsonMode(false)}}
+              style={{padding:"10px 16px",borderRadius:"11px",border:"1px solid var(--border-default)",background:"var(--bg-surface)",color:"var(--text-primary)",fontFamily:"var(--font-body)",fontSize:"13px",cursor:"pointer"}}>
+              📄 Import CSV
+            </motion.button>
+            <motion.button whileHover={{scale:1.03}} whileTap={{scale:0.97}} onClick={()=>{setJsonMode(true);setAddingNew(false);setEditingId(null);setCsvMode(false)}}
               style={{padding:"10px 16px",borderRadius:"11px",border:"1px solid var(--border-default)",background:"var(--bg-surface)",color:"var(--text-primary)",fontFamily:"var(--font-body)",fontSize:"13px",cursor:"pointer"}}>
               📥 Import JSON
             </motion.button>
-            <motion.button whileHover={{scale:1.03}} whileTap={{scale:0.97}} onClick={()=>{setAddingNew(true);setEditingId(null);setJsonMode(false)}}
+            <motion.button whileHover={{scale:1.03}} whileTap={{scale:0.97}} onClick={()=>{setAddingNew(true);setEditingId(null);setJsonMode(false);setCsvMode(false)}}
               style={{padding:"10px 18px",borderRadius:"11px",border:"none",background:"var(--accent-primary)",color:"var(--text-on-accent)",fontFamily:"var(--font-body)",fontSize:"13px",fontWeight:600,cursor:"pointer"}}>
               ➕ เพิ่มคำ
             </motion.button>
@@ -281,6 +639,86 @@ export default function AdminVocabPage() {
                       ))}
                     </div>
                   </motion.div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* CSV import */}
+        <AnimatePresence>
+          {csvMode&&(
+            <motion.div initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
+              style={{overflow:"hidden",marginBottom:"16px"}}>
+              <div style={{background:"var(--bg-surface)",border:"1px solid var(--border-default)",borderRadius:"16px",padding:"20px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
+                  <h2 style={{fontFamily:"var(--font-display)",fontSize:"16px",fontWeight:600,color:"var(--text-primary)",margin:0}}>📄 Import CSV</h2>
+                  <button onClick={()=>{setCsvMode(false);setCsvFile(null)}} style={{padding:"4px 12px",borderRadius:"8px",border:"1px solid var(--border-default)",background:"transparent",color:"var(--text-secondary)",fontFamily:"var(--font-body)",fontSize:"12px",cursor:"pointer"}}>ยกเลิก</button>
+                </div>
+                <p style={{fontFamily:"var(--font-body)",fontSize:"12px",color:"var(--text-muted)",margin:"0 0 10px"}}>
+                  CSV format: english,thai,phonetic,example,category,difficulty (headers required)
+                </p>
+                <div style={{display:"flex",alignItems:"center",gap:"12px",marginBottom:"12px"}}>
+                  <input 
+                    type="file" 
+                    accept=".csv" 
+                    onChange={e=>setCsvFile(e.target.files?.[0]||null)}
+                    style={{flex:1,padding:"10px",borderRadius:"10px",border:"1px solid var(--border-default)",background:"var(--bg-elevated)",color:"var(--text-primary)",fontFamily:"var(--font-body)",fontSize:"14px",outline:"none",boxSizing:"border-box"}}
+                  />
+                  {csvFile && (
+                    <span style={{fontFamily:"var(--font-body)",fontSize:"12px",color:"var(--text-secondary)",minWidth:"120px"}}>
+                      {csvFile.name}
+                    </span>
+                  )}
+                </div>
+                <div style={{display:"flex",gap:"10px"}}>
+                  <button 
+                    onClick={handleCsvUpload}
+                    disabled={!csvFile || csvUploading}
+                    style={{flex:1,padding:"10px",borderRadius:"10px",border:"none",background: (!csvFile || csvUploading) ? "var(--border-default)" : "var(--accent-primary)",color: (!csvFile || csvUploading) ? "var(--text-muted)" : "var(--text-on-accent)",fontFamily:"var(--font-body)",fontSize:"14px",fontWeight:600,cursor: (!csvFile || csvUploading) ? "not-allowed" : "pointer",opacity: (!csvFile || csvUploading) ? 0.6 : 1}}>
+                    {csvUploading ? "กำลังอัปโหลด..." : "📤 อัปโหลด CSV"}
+                  </button>
+                </div>
+                
+                {/* Progress Bar */}
+                {csvUploading && csvProgress.total > 0 && (
+                  <div style={{marginTop:"12px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                      <span style={{fontFamily:"var(--font-body)",fontSize:"12px",color:"var(--text-secondary)"}}>
+                        {csvProgress.message}
+                      </span>
+                      <span style={{fontFamily:"var(--font-body)",fontSize:"12px",color:"var(--text-secondary)"}}>
+                        {csvProgress.current} / {csvProgress.total}
+                      </span>
+                    </div>
+                    <div style={{
+                      width:"100%",
+                      height:"8px",
+                      backgroundColor:"var(--bg-subtle)",
+                      borderRadius:"4px",
+                      overflow:"hidden"
+                    }}>
+                      <motion.div
+                        initial={{width: "0%"}}
+                        animate={{width: `${(csvProgress.current / csvProgress.total) * 100}%`}}
+                        transition={{duration: 0.3}}
+                        style={{
+                          height:"100%",
+                          backgroundColor:"var(--accent-primary)",
+                          borderRadius:"4px"
+                        }}
+                      />
+                    </div>
+                    <div style={{
+                      marginTop:"4px",
+                      fontFamily:"var(--font-body)",
+                      fontSize:"11px",
+                      color:"var(--text-muted)",
+                      textAlign:"center"
+                    }}>
+                      {Math.round((csvProgress.current / csvProgress.total) * 100)}% เสร็จสิ้น
+                    </div>
+                  </div>
                 )}
               </div>
             </motion.div>

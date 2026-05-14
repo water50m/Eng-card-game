@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
 import { ThemePicker } from "./ThemePicker"
 import { FontSizeWidget } from "./FontSizeWidget"
+import { ApiStatusPanel } from "./ApiStatusPanel"
 import { useAuth } from "../hooks/useAuth"
 
 const NAV = [
@@ -70,6 +71,7 @@ export function NavBar() {
               {user.emoji} {user.name}
             </button>
           )}
+          <ApiStatusPanel/>
           <FontSizeWidget compact/>
           <ThemePicker/>
         </div>

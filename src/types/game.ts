@@ -1,9 +1,26 @@
 // english-card-game/src/types/game.ts
-export type GameMode = "multiple-choice" | "think-reveal" | "timed" | "typing" | "invert"
+export type GameMode = "multiple-choice" | "think-reveal" | "timed-reveal" | "timed" | "typing" | "invert"
 export type Difficulty = 1 | 2 | 3 | 4 | 5
 export type MarkLevel = 0 | 1 | 2 | 3
-export const MARK_LABELS: Record<MarkLevel, string> = { 0:"Active", 1:"Known", 2:"Mastered", 3:"Hidden" }
-export const MARK_ICONS:  Record<MarkLevel, string> = { 0:"📖", 1:"✅", 2:"⭐", 3:"🚫" }
+export const MARK_LABELS: Record<MarkLevel, string> = {
+  0: "ยังเรียนอยู่",      // show every time
+  1: "จำได้แล้ว",         // show 1 in 5
+  2: "ขึ้นใจแล้ว",        // show 1 in 20
+  3: "ข้ามคำนี้",         // never show
+}
+export const MARK_LABELS_SHORT: Record<MarkLevel, string> = {
+  0: "ยังเรียนอยู่",
+  1: "จำได้แล้ว",
+  2: "ขึ้นใจแล้ว",
+  3: "ข้ามคำนี้",
+}
+export const MARK_ICONS: Record<MarkLevel, string> = { 0:"🔄", 1:"🧠", 2:"💡", 3:"⏭️" }
+export const MARK_FREQ: Record<MarkLevel, string> = {
+  0: "โผล่ทุกรอบ",
+  1: "โผล่ 1 ใน 5 รอบ",
+  2: "โผล่ 1 ใน 20 รอบ",
+  3: "ไม่โผล่อีก",
+}
 
 export type QuizCategory = "all"|"daily-life"|"fruits"|"top-3000"|"engineering"|"reading-manga"|"reading-novel"|"reading-news"|"custom"
 export const QUIZ_CATEGORIES: { id:QuizCategory; label:string; emoji:string; desc:string }[] = [
