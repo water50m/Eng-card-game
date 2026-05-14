@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/database'
 import { withAuth } from '@/lib/middleware'
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authResult = await withAuth(request)
   
   if (authResult instanceof NextResponse) {
     return authResult // Error response
   }
   
-  const { id } = params
+  const { id } = await params
   
   try {
     await pool.query("DELETE FROM vocabulary WHERE id = $1", [id])

@@ -307,7 +307,6 @@ export default function AdminPage() {
                   disabled={seedStatus === "loading"}
                   style={{
                     padding: "10px 20px", borderRadius: "12px",
-                    border: "none",
                     background: seedStatus === "done" ? "var(--color-success)" : "var(--bg-elevated)",
                     color: seedStatus === "done" ? "#fff" : "var(--text-primary)",
                     border: "1px solid var(--border-default)",

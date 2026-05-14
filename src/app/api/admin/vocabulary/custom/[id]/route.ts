@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/database'
 import { withAdminAuth } from '@/lib/middleware'
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authResult = await withAdminAuth(request)
   
   if (authResult instanceof NextResponse) {
@@ -10,7 +10,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
   
   const { english, thai, phonetic, example, category, difficulty } = await request.json()
-  const { id } = params
+  const { id } = await params
   
   try {
     const result = await pool.query(
@@ -32,14 +32,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authResult = await withAdminAuth(request)
   
   if (authResult instanceof NextResponse) {
     return authResult // Error response
   }
   
-  const { id } = params
+  const { id } = await params
   
   try {
     const result = await pool.query(

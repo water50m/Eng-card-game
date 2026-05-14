@@ -1,0 +1,14 @@
+.git
+.next
+node_modules
+npm-debug.log*
+Dockerfile*
+docker-compose*.yml
+.env
+.env.local
+.env.development
+.env.production
+tsconfig.tsbuildinfo
+README.md
+game_raw.md
+next state.md

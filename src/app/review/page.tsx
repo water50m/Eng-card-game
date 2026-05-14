@@ -173,4 +173,70 @@ export default function ReviewPage() {
                 const isSelected = selected === opt
                 const isCorrect  = opt === current.thai
                 let bg = "var(--option-bg)", border = "var(--border-default)", color = "var(--text-primary)"
-                if (selected !== null
+                if (selected !== null) {
+                  if (isCorrect) {
+                    bg = "var(--option-correct)"
+                    border = "var(--color-success)"
+                    color = "var(--color-success)"
+                  } else if (isSelected) {
+                    bg = "var(--option-wrong)"
+                    border = "var(--color-danger)"
+                    color = "var(--color-danger)"
+                  }
+                }
+
+                return (
+                  <motion.button
+                    key={opt}
+                    onClick={() => handleAnswer(opt)}
+                    disabled={selected !== null}
+                    whileHover={selected === null ? { scale: 1.02 } : {}}
+                    whileTap={selected === null ? { scale: 0.98 } : {}}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    style={{
+                      padding: "14px 16px",
+                      borderRadius: "14px",
+                      border: `1.5px solid ${border}`,
+                      background: bg,
+                      color,
+                      fontFamily: "var(--font-body)",
+                      fontSize: "15px",
+                      fontWeight: 600,
+                      cursor: selected === null ? "pointer" : "default",
+                    }}
+                  >
+                    {opt}
+                  </motion.button>
+                )
+              })}
+            </div>
+
+            <AnimatePresence>
+              {feedback && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  style={{
+                    marginTop: "16px",
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    textAlign: "center",
+                    fontFamily: "var(--font-body)",
+                    fontWeight: 700,
+                    color: feedback === "correct" ? "var(--color-success)" : "var(--color-danger)",
+                    background: feedback === "correct" ? "var(--option-correct)" : "var(--option-wrong)",
+                  }}
+                >
+                  {feedback === "correct" ? "ถูกต้อง!" : `คำตอบที่ถูก: ${current.thai}`}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
+      </main>
+    </div>
+  )
+}

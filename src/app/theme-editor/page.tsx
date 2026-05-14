@@ -10,14 +10,14 @@ import {
 } from "../../themes/themes"
 
 const GOOGLE_FONTS = [
-  { label:"Outfit (modern)",   import:"https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap",       display:"'Outfit',sans-serif",   body:"'Outfit',sans-serif",   mono:"'Outfit',monospace" },
-  { label:"Inter (clean)",     import:"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",             display:"'Inter',sans-serif",    body:"'Inter',sans-serif",    mono:"'Inter',monospace" },
-  { label:"Quicksand (round)", import:"https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap",    display:"'Quicksand',sans-serif",body:"'Quicksand',sans-serif",mono:"'Quicksand',monospace" },
-  { label:"Lora (serif)",      import:"https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&display=swap", display:"'Lora',serif",          body:"'Lora',serif",          mono:"'Lora',monospace" },
-  { label:"Space Mono",        import:"https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap",           display:"'Space Mono',monospace",body:"'Space Mono',monospace",mono:"'Space Mono',monospace" },
-  { label:"Raleway (elegant)", import:"https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700&display=swap",      display:"'Raleway',sans-serif",  body:"'Raleway',sans-serif",  mono:"'Raleway',monospace" },
-  { label:"Exo 2 (tech)",      import:"https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;700;900&display=swap",       display:"'Exo 2',sans-serif",    body:"'Exo 2',sans-serif",    mono:"'Exo 2',monospace" },
-  { label:"Nunito (friendly)", import:"https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap",           display:"'Nunito',sans-serif",   body:"'Nunito',sans-serif",   mono:"'Nunito',monospace" },
+  { label:"Outfit (modern)",   googleImport:"https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap",       display:"'Outfit',sans-serif",   body:"'Outfit',sans-serif",   mono:"'Outfit',monospace" },
+  { label:"Inter (clean)",     googleImport:"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",             display:"'Inter',sans-serif",    body:"'Inter',sans-serif",    mono:"'Inter',monospace" },
+  { label:"Quicksand (round)", googleImport:"https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap",    display:"'Quicksand',sans-serif",body:"'Quicksand',sans-serif",mono:"'Quicksand',monospace" },
+  { label:"Lora (serif)",      googleImport:"https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&display=swap", display:"'Lora',serif",          body:"'Lora',serif",          mono:"'Lora',monospace" },
+  { label:"Space Mono",        googleImport:"https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap",           display:"'Space Mono',monospace",body:"'Space Mono',monospace",mono:"'Space Mono',monospace" },
+  { label:"Raleway (elegant)", googleImport:"https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700&display=swap",      display:"'Raleway',sans-serif",  body:"'Raleway',sans-serif",  mono:"'Raleway',monospace" },
+  { label:"Exo 2 (tech)",      googleImport:"https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;700;900&display=swap",       display:"'Exo 2',sans-serif",    body:"'Exo 2',sans-serif",    mono:"'Exo 2',monospace" },
+  { label:"Nunito (friendly)", googleImport:"https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap",           display:"'Nunito',sans-serif",   body:"'Nunito',sans-serif",   mono:"'Nunito',monospace" },
 ]
 
 type CF = { key: keyof Theme["colors"]; label: string; group: string }
@@ -323,14 +323,14 @@ export default function ThemeEditorPage() {
                   {GOOGLE_FONTS.map((f,i)=>(
                     <button key={i} onClick={()=>setEditing(p=>({...p,fonts:f}))} style={{
                       padding:"9px 12px",borderRadius:"9px",border:"1px solid",
-                      borderColor:editing.fonts.import===f.import?"var(--accent-primary)":"var(--border-default)",
-                      background:editing.fonts.import===f.import?"var(--bg-subtle)":"transparent",
-                      color:editing.fonts.import===f.import?"var(--accent-primary)":"var(--text-secondary)",
+                      borderColor:editing.fonts.googleImport===f.googleImport?"var(--accent-primary)":"var(--border-default)",
+                      background:editing.fonts.googleImport===f.googleImport?"var(--bg-subtle)":"transparent",
+                      color:editing.fonts.googleImport===f.googleImport?"var(--accent-primary)":"var(--text-secondary)",
                       fontFamily:"var(--font-body)",fontSize:"13px",textAlign:"left",cursor:"pointer",
                       display:"flex",justifyContent:"space-between",alignItems:"center",
                     }}>
                       <span>{f.label}</span>
-                      {editing.fonts.import===f.import&&<span style={{fontSize:"10px",opacity:0.7}}>✓</span>}
+                      {editing.fonts.googleImport===f.googleImport&&<span style={{fontSize:"10px",opacity:0.7}}>✓</span>}
                     </button>
                   ))}
                 </div>
