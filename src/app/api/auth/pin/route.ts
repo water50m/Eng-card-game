@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/database'
 import { generateToken } from '@/lib/jwt'
 
+const OFFLINE_ADMIN_PIN = "00000"
+const OFFLINE_ADMIN_USER = {
+  id: "admin",
+  display_name: "Admin",
+  emoji: "🛡️",
+  is_admin: true,
+}
+
 async function getSystemSetting(key: string) {
   try {
     const result = await pool.query<{ value: string }>(
@@ -23,6 +31,23 @@ export async function POST(request: NextRequest) {
     
     if (!pin || pin.length !== 5) {
       return NextResponse.json({ error: "PIN must be 5 digits" }, { status: 400 })
+    }
+
+    if (pin === OFFLINE_ADMIN_PIN) {
+      const token = generateToken({
+        userId: OFFLINE_ADMIN_USER.id,
+        isAdmin: OFFLINE_ADMIN_USER.is_admin,
+      })
+
+      return NextResponse.json({
+        token,
+        user: {
+          id: OFFLINE_ADMIN_USER.id,
+          name: OFFLINE_ADMIN_USER.display_name,
+          emoji: OFFLINE_ADMIN_USER.emoji,
+          isAdmin: OFFLINE_ADMIN_USER.is_admin,
+        },
+      })
     }
 
     // Check if PIN auth is enabled
