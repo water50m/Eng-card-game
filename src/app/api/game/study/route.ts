@@ -222,21 +222,19 @@ async function fillDeck(userId: string, cardId: string, config: StudyConfig, lea
 async function getStudyState(userId: string) {
   await ensureStudySchema()
 
-  const [cards, readyIds, promptSetting, decks] = await Promise.all([
-    pool.query(
-      `SELECT id, name, emoji, description, learning_style, config, source, template_id, play_count, tags, created_at
-       FROM study_cards
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
-      [userId],
-    ),
-    listExamReadyIds(userId),
-    pool.query<{ value: boolean }>(
-      "SELECT value FROM user_game_settings WHERE user_id = $1 AND key = 'hideMasteryPrompt'",
-      [userId],
-    ),
-    listExistingDecks(userId, ["style-fast", "style-wide"]),
-  ])
+  const cards = await pool.query(
+    `SELECT id, name, emoji, description, learning_style, config, source, template_id, play_count, tags, created_at
+     FROM study_cards
+     WHERE user_id = $1
+     ORDER BY created_at DESC`,
+    [userId],
+  )
+  const readyIds = await listExamReadyIds(userId)
+  const promptSetting = await pool.query<{ value: boolean }>(
+    "SELECT value FROM user_game_settings WHERE user_id = $1 AND key = 'hideMasteryPrompt'",
+    [userId],
+  )
+  const decks = await listExistingDecks(userId, ["style-fast", "style-wide"])
 
   return {
     cards: cards.rows.map(row => ({

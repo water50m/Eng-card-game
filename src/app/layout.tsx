@@ -19,7 +19,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // Suppress hydration warning on html — ThemeProvider adds/removes "dark" class client-side
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         {/* Inline default CSS vars so first paint matches server render */}
         <style dangerouslySetInnerHTML={{ __html: `
