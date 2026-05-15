@@ -16,5 +16,12 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - postgres
     ports:
       - "3000:3000"
+
+networks:
+  postgres:
+    external: true
+    name: ${POSTGRES_DOCKER_NETWORK:-postgresql-server_default}
