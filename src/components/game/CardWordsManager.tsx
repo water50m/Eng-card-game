@@ -11,7 +11,7 @@ export function CardWordsManager({ card, words, allWords, loading, onClose, onAd
   allWords: VocabWord[]
   loading: boolean
   onClose: () => void
-  onAddWord: (wordId: string) => void
+  onAddWord: (wordId: string) => void | Promise<void>
   onRemoveWord: (wordId: string) => void
 }) {
   const [search, setSearch] = useState("")
@@ -24,11 +24,11 @@ export function CardWordsManager({ card, words, allWords, loading, onClose, onAd
       .slice(0, 10)
     : []
 
-  function addRandomWord() {
+  async function addRandomWord() {
     if (randomCandidates.length === 0) return
     const word = randomCandidates[Math.floor(Math.random() * randomCandidates.length)]
-    onAddWord(word.id)
-    setSearch("")
+    setSearch(`${word.english} - ${word.thai}`)
+    await onAddWord(word.id)
   }
 
   return (
