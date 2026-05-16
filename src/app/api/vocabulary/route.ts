@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/database'
 import { withAuth } from '@/lib/middleware'
+import { ensureVocabularySchema, upsertVocabularyWord } from '@/lib/vocabularySchema'
 
 export async function GET(request: NextRequest) {
   const authResult = await withAuth(request)
@@ -15,37 +16,29 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search')
   
   try {
+    await ensureVocabularySchema()
+
     let query = `
-      SELECT *
-      FROM (
-        SELECT
-          id::text,
-          english,
-          thai,
-          phonetic,
-          example,
-          category,
-          difficulty,
-          false AS "isUserWord"
-        FROM vocabulary
-        UNION ALL
-        SELECT
-          'custom-' || id::text AS id,
-          english,
-          thai,
-          phonetic,
-          example,
-          category,
-          difficulty,
-          true AS "isUserWord"
-        FROM admin_custom_vocabulary
-      ) words`
+      SELECT
+        id::text,
+        english,
+        thai,
+        phonetic,
+        example,
+        category,
+        difficulty,
+        synonyms,
+        created_by,
+        created_at,
+        updated_at,
+        created_by IS NOT NULL AS "isUserWord"
+      FROM vocabulary`
     const params: (string | number)[] = []
     const conditions: string[] = []
 
     if (category) {
       if (category === "custom") {
-        conditions.push(`"isUserWord" = true`)
+        conditions.push(`created_by IS NOT NULL`)
       } else {
         params.push(category)
         conditions.push(`category = $${params.length}`)
@@ -88,11 +81,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await pool.query(
-      "INSERT INTO vocabulary (english, thai, phonetic, example, category, difficulty) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-      [english, thai, phonetic, example, category || 'general', difficulty || 2]
-    )
-    return NextResponse.json(result.rows[0], { status: 201 })
+    const row = await upsertVocabularyWord({
+      english,
+      thai,
+      phonetic,
+      example,
+      category,
+      difficulty,
+      createdBy: authResult.user.userId,
+    })
+    return NextResponse.json(row, { status: 201 })
   } catch (error) {
     console.error('Add vocabulary error:', error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

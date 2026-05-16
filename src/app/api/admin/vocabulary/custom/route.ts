@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/database'
 import { withAdminAuth } from '@/lib/middleware'
+import { ensureVocabularySchema, upsertVocabularyWord } from '@/lib/vocabularySchema'
 
 export async function GET(request: NextRequest) {
   const authResult = await withAdminAuth(request)
@@ -10,8 +11,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    await ensureVocabularySchema()
     const result = await pool.query(
-      'SELECT * FROM admin_custom_vocabulary ORDER BY created_at DESC'
+      'SELECT *, created_by IS NOT NULL AS "isUserWord" FROM vocabulary WHERE created_by IS NOT NULL ORDER BY created_at DESC'
     )
     return NextResponse.json(result.rows)
   } catch (error) {
@@ -31,6 +33,8 @@ export async function POST(request: NextRequest) {
   const { english, thai, phonetic, example, category, difficulty } = await request.json()
   
   try {
+    await ensureVocabularySchema()
+
     if (!english || !thai) {
       return NextResponse.json({ error: "english and thai are required" }, { status: 400 })
     }
@@ -39,16 +43,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 })
     }
     
-    const result = await pool.query(
-      'INSERT INTO admin_custom_vocabulary (english, thai, phonetic, example, category, difficulty, created_by) ' +
-      'VALUES ($1, $2, $3, $4, $5, $6, $7) ' +
-      'ON CONFLICT (english) DO UPDATE SET ' +
-      'thai = $2, phonetic = $3, example = $4, category = $5, difficulty = $6, updated_at = NOW() ' +
-      'RETURNING *',
-      [english, thai, phonetic, example, category || 'general', difficulty || 2, createdBy]
-    )
+    const row = await upsertVocabularyWord({
+      english,
+      thai,
+      phonetic,
+      example,
+      category,
+      difficulty,
+      createdBy,
+    })
     
-    return NextResponse.json(result.rows[0], { status: 201 })
+    return NextResponse.json(row, { status: 201 })
   } catch (error) {
     console.error('POST admin vocab - Error:', error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

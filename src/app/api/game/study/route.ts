@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/database"
 import { withAuth } from "@/lib/middleware"
 import { ensureStudySchema } from "@/lib/studySchema"
+import { ensureVocabularySchema } from "@/lib/vocabularySchema"
 
 type StudyConfig = {
   category: string
@@ -55,9 +56,8 @@ async function getRandomWordIds(category: string | undefined, limit: number, exc
   let query = `
     SELECT id
     FROM (
-      SELECT id::text, category, false AS is_user_word FROM vocabulary
-      UNION ALL
-      SELECT 'custom-' || id::text, category, true AS is_user_word FROM admin_custom_vocabulary
+      SELECT id::text, category, created_by IS NOT NULL AS is_user_word
+      FROM vocabulary
     ) words`
 
   if (conditions.length) query += ` WHERE ${conditions.join(" AND ")}`
@@ -129,19 +129,8 @@ async function getCardWords(userId: string, cardId: string) {
          example,
          category,
          difficulty,
-         false AS "isUserWord"
+         created_by IS NOT NULL AS "isUserWord"
        FROM vocabulary
-       UNION ALL
-       SELECT
-         'custom-' || id::text,
-         english,
-         thai,
-         phonetic,
-         example,
-         category,
-         difficulty,
-         true AS "isUserWord"
-       FROM admin_custom_vocabulary
      ) words ON words.id = scw.word_id
      WHERE scw.user_id = $1 AND scw.card_id = $2
      ORDER BY scw.position ASC, scw.created_at ASC`,
@@ -169,9 +158,7 @@ async function fillDeck(userId: string, cardId: string, config: StudyConfig, lea
       `SELECT scw.word_id, scw.position
        FROM study_card_words scw
        JOIN (
-         SELECT id::text, category, false AS is_user_word FROM vocabulary
-         UNION ALL
-         SELECT 'custom-' || id::text, category, true AS is_user_word FROM admin_custom_vocabulary
+         SELECT id::text, category, created_by IS NOT NULL AS is_user_word FROM vocabulary
        ) words ON words.id = scw.word_id
        LEFT JOIN exam_ready_words erw
          ON erw.user_id = scw.user_id AND erw.word_id = scw.word_id
@@ -220,6 +207,7 @@ async function fillDeck(userId: string, cardId: string, config: StudyConfig, lea
 }
 
 async function getStudyState(userId: string) {
+  await ensureVocabularySchema()
   await ensureStudySchema()
 
   const cards = await pool.query(
@@ -277,6 +265,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
 
   try {
+    await ensureVocabularySchema()
     await ensureStudySchema()
 
     if (body.action === "save-card") {

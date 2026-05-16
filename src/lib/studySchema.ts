@@ -70,5 +70,4 @@ async function initializeStudySchema() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_study_card_words_card ON study_card_words(user_id, card_id, position)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_ready_words_status ON exam_ready_words(user_id, status)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_vocabulary_category_id ON vocabulary(category, id)`)
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_admin_custom_vocabulary_category_id ON admin_custom_vocabulary(category, id)`)
 }

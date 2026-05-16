@@ -29,6 +29,13 @@ docker inspect "$container_id" --format 'Name={{.Name}} Status={{.State.Status}}
 echo "==> Web container networks"
 docker inspect "$container_id" --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}'
 
+echo "==> Postgres container networks, if my-postgres exists"
+if docker inspect my-postgres >/dev/null 2>&1; then
+  docker inspect my-postgres --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}'
+else
+  echo "WARN: container my-postgres was not found"
+fi
+
 echo "==> Database env inside web container"
 docker exec "$container_id" node -e '
 function redact(value) {
@@ -57,7 +64,7 @@ if (!process.env.DATABASE_URL) process.exit(2)
 '
 
 echo "==> DNS and TCP check from web container"
-docker exec "$container_id" node - <<'NODE'
+docker exec -i "$container_id" node - <<'NODE'
 const net = require("node:net")
 const dns = require("node:dns").promises
 
@@ -102,7 +109,7 @@ main().catch(error => {
 NODE
 
 echo "==> PostgreSQL query check from web container"
-docker exec "$container_id" node - <<'NODE'
+docker exec -i "$container_id" node - <<'NODE'
 const { Pool } = require("pg")
 
 function getSslConfig() {

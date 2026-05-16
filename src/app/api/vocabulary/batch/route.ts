@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAdminAuth } from '../../../../lib/middleware'
 import pool from '../../../../lib/database'
+import { bulkUpsertVocabularyWords, ensureVocabularySchema } from '../../../../lib/vocabularySchema'
 
 type BatchWord = {
   english?: string
@@ -42,12 +43,9 @@ export async function POST(request: NextRequest) {
     let errorCount = 0
     const errors: string[] = []
 
-    // Get existing words to check for duplicates across seed DB and admin imports.
-    const existingQuery = await pool.query(
-      `SELECT english FROM vocabulary
-       UNION
-       SELECT english FROM admin_custom_vocabulary`
-    )
+    await ensureVocabularySchema()
+
+    const existingQuery = await pool.query('SELECT english FROM vocabulary')
     const existingWords = new Set(
       existingQuery.rows.map((row: { english: string }) => row.english.toLowerCase())
     )
@@ -104,35 +102,10 @@ export async function POST(request: NextRequest) {
       }
       
       try {
-        // Build batch INSERT query
-        const values = deduplicatedBatch.flatMap((word) => [
-          word.english,
-          word.thai,
-          word.phonetic,
-          word.example,
-          word.category,
-          word.difficulty,
-          userId
-        ])
-
-        const placeholders = deduplicatedBatch.map((_, index) => {
-          const offset = index * 7
-          return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, NOW())`
-        }).join(', ')
-
-        await pool.query(
-          `INSERT INTO admin_custom_vocabulary 
-           (english, thai, phonetic, example, category, difficulty, created_by, created_at)
-           VALUES ${placeholders}
-           ON CONFLICT (english) DO UPDATE SET
-           thai = EXCLUDED.thai,
-           phonetic = EXCLUDED.phonetic,
-           example = EXCLUDED.example,
-           category = EXCLUDED.category,
-           difficulty = EXCLUDED.difficulty,
-           updated_at = NOW()`,
-          values
-        )
+        await bulkUpsertVocabularyWords(deduplicatedBatch.map(word => ({
+          ...word,
+          createdBy: userId,
+        })))
 
         successCount += deduplicatedBatch.length
         console.log(`📊 API: Batch ${Math.floor(batchStart / BATCH_SIZE) + 1} completed (${deduplicatedBatch.length} words) - Total: ${successCount}/${validWords.length}`)

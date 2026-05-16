@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pool from '@/lib/database'
 import { withAdminAuth } from '@/lib/middleware'
+import { ensureVocabularySchema, upsertVocabularyWord } from '@/lib/vocabularySchema'
 
 export async function POST(request: NextRequest) {
   const authResult = await withAdminAuth(request)
@@ -12,6 +12,8 @@ export async function POST(request: NextRequest) {
   const createdBy = authResult.user.userId
   
   try {
+    await ensureVocabularySchema()
+
     const formData = await request.formData()
     const file = formData.get('file') as File
     
@@ -63,22 +65,15 @@ export async function POST(request: NextRequest) {
           continue
         }
         
-        const result = await pool.query(
-          'INSERT INTO admin_custom_vocabulary (english, thai, phonetic, example, category, difficulty, created_by) ' +
-          'VALUES ($1, $2, $3, $4, $5, $6, $7) ' +
-          'ON CONFLICT (english) DO UPDATE SET ' +
-          'thai = $2, phonetic = $3, example = $4, category = $5, difficulty = $6, updated_at = NOW() ' +
-          'RETURNING *',
-          [
-            rowData.english,
-            rowData.thai,
-            rowData.phonetic || null,
-            rowData.example || null,
-            rowData.category || 'general',
-            parseInt(rowData.difficulty) || 2,
-            createdBy
-          ]
-        )
+        await upsertVocabularyWord({
+          english: rowData.english,
+          thai: rowData.thai,
+          phonetic: rowData.phonetic || null,
+          example: rowData.example || null,
+          category: rowData.category || 'general',
+          difficulty: parseInt(rowData.difficulty) || 2,
+          createdBy,
+        })
         
         successCount++
         
@@ -136,22 +131,15 @@ export async function POST(request: NextRequest) {
                 continue
               }
               
-              const result = await pool.query(
-                'INSERT INTO admin_custom_vocabulary (english, thai, phonetic, example, category, difficulty, created_by) ' +
-                'VALUES ($1, $2, $3, $4, $5, $6, $7) ' +
-                'ON CONFLICT (english) DO UPDATE SET ' +
-                'thai = $2, phonetic = $3, example = $4, category = $5, difficulty = $6, updated_at = NOW() ' +
-                'RETURNING *',
-                [
-                  rowData.english,
-                  rowData.thai,
-                  rowData.phonetic || null,
-                  rowData.example || null,
-                  rowData.category || 'general',
-                  parseInt(rowData.difficulty) || 2,
-                  createdBy
-                ]
-              )
+              await upsertVocabularyWord({
+                english: rowData.english,
+                thai: rowData.thai,
+                phonetic: rowData.phonetic || null,
+                example: rowData.example || null,
+                category: rowData.category || 'general',
+                difficulty: parseInt(rowData.difficulty) || 2,
+                createdBy,
+              })
               
               successCount++
               console.log(`✅ API: Successfully processed word ${successCount}: ${rowData.english} -> ${rowData.thai}`)
