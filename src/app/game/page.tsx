@@ -251,7 +251,7 @@ export default function GamePage() {
     })
     if(data?.state) applyStudyState(data.state)
     setWordManagerIds(data?.wordIds ?? [])
-    setWordManagerWords(data?.words ? data.words.map(toVocabWord) : wordsFromIds(data?.wordIds ?? []))
+    setWordManagerWords(data?.words?.length ? data.words.map(toVocabWord) : wordsFromIds(data?.wordIds ?? []))
     if(data?.wordIds) setPreloadedDecks(prev => ({...prev, [card.id]:data.wordIds}))
     setWordManagerLoading(false)
   }

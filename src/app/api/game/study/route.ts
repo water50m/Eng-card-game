@@ -312,7 +312,10 @@ export async function POST(request: NextRequest) {
 
     if (body.action === "get-card-words") {
       const cardId = String(body.cardId)
-      const ids = await listCardWordIds(userId, cardId)
+      const currentIds = await listCardWordIds(userId, cardId)
+      const ids = currentIds.length === 0 && body.config && body.learningStyle
+        ? await fillDeck(userId, cardId, body.config, body.learningStyle)
+        : currentIds
       const words = await getCardWords(userId, cardId)
       return NextResponse.json({ wordIds: ids, words })
     }
