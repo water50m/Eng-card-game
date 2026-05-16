@@ -5,13 +5,14 @@ import { motion } from "framer-motion"
 import type { VocabWord } from "@/types/game"
 import type { PlayableCard } from "@/lib/studyCards"
 
-export function CardWordsManager({ card, words, allWords, loading, onClose, onAddWord, onRemoveWord }: {
+export function CardWordsManager({ card, words, allWords, loading, onClose, onAddWord, onRandomWord, onRemoveWord }: {
   card: PlayableCard
   words: VocabWord[]
   allWords: VocabWord[]
   loading: boolean
   onClose: () => void
   onAddWord: (wordId: string) => void | Promise<void>
+  onRandomWord?: () => Promise<VocabWord | null>
   onRemoveWord: (wordId: string) => void
 }) {
   const [search, setSearch] = useState("")
@@ -19,6 +20,7 @@ export function CardWordsManager({ card, words, allWords, loading, onClose, onAd
   const [adding, setAdding] = useState(false)
   const currentIds = useMemo(() => new Set(words.map(w => w.id)), [words])
   const randomCandidates = useMemo(() => allWords.filter(w => !currentIds.has(w.id)), [allWords, currentIds])
+  const randomDisabled = loading || adding || (!onRandomWord && randomCandidates.length === 0)
   const activeLimit = Math.max(1, Number(card.config?.size) || 10)
   const results = search.trim().length >= 2
     ? allWords
@@ -32,9 +34,14 @@ export function CardWordsManager({ card, words, allWords, loading, onClose, onAd
     setSearch(`${word.english} - ${word.thai}`)
   }
 
-  function addRandomWord() {
-    if (randomCandidates.length === 0) return
-    const word = randomCandidates[Math.floor(Math.random() * randomCandidates.length)]
+  async function addRandomWord() {
+    if (loading || adding) return
+    setAdding(true)
+    const word = onRandomWord
+      ? await onRandomWord()
+      : randomCandidates[Math.floor(Math.random() * randomCandidates.length)] ?? null
+    setAdding(false)
+    if (!word) return
     selectWord(word)
   }
 
@@ -93,9 +100,9 @@ export function CardWordsManager({ card, words, allWords, loading, onClose, onAd
             style={{ padding: "0 15px", borderRadius: "12px", border: "1px solid var(--border-default)", background: loading || adding || !selectedWord || currentIds.has(selectedWord.id) ? "var(--bg-subtle)" : "var(--accent-primary)", color: loading || adding || !selectedWord || currentIds.has(selectedWord.id) ? "var(--text-muted)" : "var(--text-on-accent)", fontFamily: "var(--font-body)", fontSize: "14px", fontWeight: 700, cursor: loading || adding || !selectedWord || currentIds.has(selectedWord.id) ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
             {adding ? "เพิ่ม..." : "เพิ่ม"}
           </button>
-          <button onClick={addRandomWord} disabled={loading || randomCandidates.length === 0} title="สุ่มคำใหม่เข้า card"
-            style={{ padding: "0 15px", borderRadius: "12px", border: "1px solid var(--border-default)", background: loading || randomCandidates.length === 0 ? "var(--bg-subtle)" : "var(--accent-primary)", color: loading || randomCandidates.length === 0 ? "var(--text-muted)" : "var(--text-on-accent)", fontFamily: "var(--font-body)", fontSize: "14px", fontWeight: 700, cursor: loading || randomCandidates.length === 0 ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
-            🎲 สุ่ม
+          <button onClick={addRandomWord} disabled={randomDisabled} title="สุ่มคำใหม่เข้า card"
+            style={{ padding: "0 15px", borderRadius: "12px", border: "1px solid var(--border-default)", background: randomDisabled ? "var(--bg-subtle)" : "var(--accent-primary)", color: randomDisabled ? "var(--text-muted)" : "var(--text-on-accent)", fontFamily: "var(--font-body)", fontSize: "14px", fontWeight: 700, cursor: randomDisabled ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+            {adding ? "สุ่ม..." : "🎲 สุ่ม"}
           </button>
         </div>
 

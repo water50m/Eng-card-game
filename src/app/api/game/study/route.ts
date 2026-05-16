@@ -156,6 +156,26 @@ async function getCardWords(userId: string, cardId: string) {
   return result.rows
 }
 
+async function getWordsByIds(ids: string[]) {
+  if (ids.length === 0) return []
+  const result = await pool.query(
+    `SELECT
+       id::text,
+       english,
+       thai,
+       phonetic,
+       example,
+       category,
+       difficulty,
+       created_by IS NOT NULL AS "isUserWord"
+     FROM vocabulary
+     WHERE id::text = ANY($1::text[])
+     ORDER BY ARRAY_POSITION($1::text[], id::text)`,
+    [ids],
+  )
+  return result.rows
+}
+
 async function fillDeck(userId: string, cardId: string, config: StudyConfig, learningStyle: string, options: FillDeckOptions = {}) {
   const baseTargetSize = getBaseTargetSize(config, learningStyle)
   const manualTargetSize = await getDeckTarget(userId, cardId)
@@ -338,6 +358,13 @@ export async function POST(request: NextRequest) {
         : currentIds
       const words = await getCardWords(userId, cardId)
       return NextResponse.json({ wordIds: ids, words })
+    }
+
+    if (body.action === "random-card-word") {
+      const excludeIds = Array.isArray(body.excludeIds) ? body.excludeIds.map(String) : []
+      const ids = await getRandomWordIds(body.category, 1, excludeIds, userId)
+      const words = await getWordsByIds(ids)
+      return NextResponse.json({ word: words[0] ?? null })
     }
 
     if (body.action === "add-card-word") {

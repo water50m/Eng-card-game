@@ -275,6 +275,16 @@ export default function GamePage() {
     if(data?.words) setWordManagerWords(data.words.map(toVocabWord))
   }
 
+  async function randomWordForManagedCard() {
+    if(!wordManagerCard) return null
+    const data = await studyRequest<{ word?: ApiVocabWord | null }>({
+      action:"random-card-word",
+      category:wordManagerCard.config.category,
+      excludeIds:wordManagerIds,
+    })
+    return data?.word ? toVocabWord(data.word) : null
+  }
+
   async function removeWordFromManagedCard(wordId: string) {
     if(!wordManagerCard) return
     const data = await studyRequest<{ wordIds: string[]; words?: ApiVocabWord[]; state?: { cards: PlayableCard[]; examReadyIds: string[]; hideMasteryPrompt: boolean } }>({
@@ -547,6 +557,7 @@ export default function GamePage() {
           loading={wordManagerLoading}
           onClose={()=>setWordManagerCard(null)}
           onAddWord={addWordToManagedCard}
+          onRandomWord={randomWordForManagedCard}
           onRemoveWord={removeWordFromManagedCard}
         />
       )}</AnimatePresence>
@@ -625,6 +636,7 @@ export default function GamePage() {
           loading={wordManagerLoading}
           onClose={()=>setWordManagerCard(null)}
           onAddWord={addWordToManagedCard}
+          onRandomWord={randomWordForManagedCard}
           onRemoveWord={removeWordFromManagedCard}
         />
       )}</AnimatePresence>
