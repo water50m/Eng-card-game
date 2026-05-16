@@ -39,6 +39,10 @@ function getBaseTargetSize(config: StudyConfig, learningStyle: string) {
   return learningStyle === "wide" ? 100 : Math.max(1, Number(config.size) || 10)
 }
 
+type FillDeckOptions = {
+  useQueuedWordsBeforeRandom?: boolean
+}
+
 async function getRandomWordIds(category: string | undefined, limit: number, excludedIds: string[], userId: string) {
   const params: unknown[] = [userId]
   const conditions: string[] = []
@@ -152,10 +156,9 @@ async function getCardWords(userId: string, cardId: string) {
   return result.rows
 }
 
-async function fillDeck(userId: string, cardId: string, config: StudyConfig, learningStyle: string) {
+async function fillDeck(userId: string, cardId: string, config: StudyConfig, learningStyle: string, options: FillDeckOptions = {}) {
   const baseTargetSize = getBaseTargetSize(config, learningStyle)
   const manualTargetSize = await getDeckTarget(userId, cardId)
-  const targetSize = manualTargetSize == null ? baseTargetSize : Math.max(baseTargetSize, manualTargetSize)
   const normalizedCategory = normalizeCategory(config.category)
   const params: unknown[] = [userId, cardId]
   const conditions = [
@@ -192,6 +195,9 @@ async function fillDeck(userId: string, cardId: string, config: StudyConfig, lea
       [userId, cardId],
     )
 
+  const targetSize = options.useQueuedWordsBeforeRandom && existing.rows.length >= baseTargetSize
+    ? existing.rows.length
+    : manualTargetSize == null ? baseTargetSize : Math.max(baseTargetSize, manualTargetSize)
   const kept = existing.rows.map(row => row.word_id).slice(0, targetSize)
   if (kept.length >= targetSize) {
     return kept
@@ -384,7 +390,8 @@ export async function POST(request: NextRequest) {
 
       if (body.cardId) {
         await pool.query("DELETE FROM study_card_words WHERE user_id = $1 AND card_id = $2 AND word_id = $3", [userId, body.cardId, body.wordId])
-        const ids = await fillDeck(userId, body.cardId, body.config, body.learningStyle)
+        const ids = await fillDeck(userId, body.cardId, body.config, body.learningStyle, { useQueuedWordsBeforeRandom: true })
+        await setDeckTarget(userId, body.cardId, ids.length)
         return NextResponse.json({ wordIds: ids, examReadyIds: await listExamReadyIds(userId) })
       }
 

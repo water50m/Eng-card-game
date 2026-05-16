@@ -316,7 +316,7 @@ export default function GamePage() {
   async function buildQueue(card:PlayableCard, cfg:QuizConfig, words?:VocabWord[]):Promise<VocabWord[]> {
     if(words) return shuffleWords(words).slice(0, cfg.size)
     const deckIds = await ensureCardDeck(card, cfg)
-    const deckWords = wordsFromIds(deckIds)
+    const deckWords = wordsFromIds(deckIds).slice(0, Math.max(1, Number(cfg.size) || 10))
     if(deckWords.length === 0) return shuffleWords(allWords).slice(0, cfg.size)
     const available = deckWords.filter(w => {
       const p=progress.get(w.id); const m=(p?.markLevel??0) as MarkLevel
