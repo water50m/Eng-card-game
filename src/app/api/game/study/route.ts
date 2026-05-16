@@ -35,6 +35,10 @@ function categoryCondition(category: string | null, params: unknown[], alias = "
   return `${alias}.category = $${params.length}`
 }
 
+function getBaseTargetSize(config: StudyConfig, learningStyle: string) {
+  return learningStyle === "wide" ? 100 : Math.max(1, Number(config.size) || 10)
+}
+
 async function getRandomWordIds(category: string | undefined, limit: number, excludedIds: string[], userId: string) {
   const params: unknown[] = [userId]
   const conditions: string[] = []
@@ -87,10 +91,11 @@ async function setDeckTarget(userId: string, cardId: string, target: number) {
 
 async function listCardWordIds(userId: string, cardId: string) {
   const result = await pool.query<{ word_id: string }>(
-    `SELECT word_id
-     FROM study_card_words
-     WHERE user_id = $1 AND card_id = $2
-     ORDER BY position ASC, created_at ASC`,
+    `SELECT scw.word_id
+     FROM study_card_words scw
+     JOIN vocabulary v ON v.id::text = scw.word_id
+     WHERE scw.user_id = $1 AND scw.card_id = $2
+     ORDER BY scw.position ASC, scw.created_at ASC`,
     [userId, cardId],
   )
   return result.rows.map(row => row.word_id)
@@ -100,8 +105,16 @@ async function listExistingDecks(userId: string, cardIds: string[]) {
   if (cardIds.length === 0) return {}
   const result = await pool.query<{ card_id: string; word_ids: string[] }>(
     `SELECT card_id, ARRAY_AGG(word_id ORDER BY position ASC, created_at ASC) AS word_ids
-     FROM study_card_words
-     WHERE user_id = $1 AND card_id = ANY($2::text[])
+     FROM (
+       SELECT scw.card_id, scw.word_id, scw.position, scw.created_at
+       FROM study_card_words scw
+       JOIN vocabulary v ON v.id::text = scw.word_id
+       LEFT JOIN exam_ready_words erw
+         ON erw.user_id = scw.user_id AND erw.word_id = scw.word_id AND erw.status = 'ready'
+       WHERE scw.user_id = $1
+         AND scw.card_id = ANY($2::text[])
+         AND erw.word_id IS NULL
+     ) valid_words
      GROUP BY card_id`,
     [userId, cardIds],
   )
@@ -140,9 +153,9 @@ async function getCardWords(userId: string, cardId: string) {
 }
 
 async function fillDeck(userId: string, cardId: string, config: StudyConfig, learningStyle: string) {
-  const baseTargetSize = learningStyle === "wide" ? 100 : Math.max(1, Number(config.size) || 10)
+  const baseTargetSize = getBaseTargetSize(config, learningStyle)
   const manualTargetSize = await getDeckTarget(userId, cardId)
-  const targetSize = manualTargetSize ?? baseTargetSize
+  const targetSize = manualTargetSize == null ? baseTargetSize : Math.max(baseTargetSize, manualTargetSize)
   const normalizedCategory = normalizeCategory(config.category)
   const params: unknown[] = [userId, cardId]
   const conditions = [
@@ -169,6 +182,7 @@ async function fillDeck(userId: string, cardId: string, config: StudyConfig, lea
     : await pool.query<{ word_id: string; position: number }>(
       `SELECT scw.word_id, scw.position
        FROM study_card_words scw
+       JOIN vocabulary v ON v.id::text = scw.word_id
        LEFT JOIN exam_ready_words erw
          ON erw.user_id = scw.user_id AND erw.word_id = scw.word_id
        WHERE scw.user_id = $1
@@ -333,8 +347,14 @@ export async function POST(request: NextRequest) {
         )
       }
       const nextIds = await listCardWordIds(userId, cardId)
-      await setDeckTarget(userId, cardId, nextIds.length)
-      return NextResponse.json({ wordIds: nextIds, words: await getCardWords(userId, cardId) })
+      const baseTarget = body.config && body.learningStyle
+        ? getBaseTargetSize(body.config, String(body.learningStyle))
+        : 0
+      await setDeckTarget(userId, cardId, Math.max(baseTarget, nextIds.length))
+      const ids = body.config && body.learningStyle
+        ? await fillDeck(userId, cardId, body.config, String(body.learningStyle))
+        : nextIds
+      return NextResponse.json({ wordIds: ids, words: await getCardWords(userId, cardId) })
     }
 
     if (body.action === "remove-card-word") {
@@ -344,8 +364,14 @@ export async function POST(request: NextRequest) {
         [userId, cardId, body.wordId],
       )
       const nextIds = await listCardWordIds(userId, cardId)
-      await setDeckTarget(userId, cardId, nextIds.length)
-      return NextResponse.json({ wordIds: nextIds, words: await getCardWords(userId, cardId) })
+      const baseTarget = body.config && body.learningStyle
+        ? getBaseTargetSize(body.config, String(body.learningStyle))
+        : 0
+      await setDeckTarget(userId, cardId, Math.max(baseTarget, nextIds.length))
+      const ids = body.config && body.learningStyle
+        ? await fillDeck(userId, cardId, body.config, String(body.learningStyle))
+        : nextIds
+      return NextResponse.json({ wordIds: ids, words: await getCardWords(userId, cardId) })
     }
 
     if (body.action === "mark-ready") {

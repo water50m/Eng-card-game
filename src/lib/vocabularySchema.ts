@@ -45,24 +45,36 @@ async function initializeVocabularySchema() {
         TRUNCATE vocabulary_custom_merge_map;
 
         INSERT INTO vocabulary
-          (id, english, thai, phonetic, example, category, difficulty, synonyms, created_by, created_at, updated_at)
+          (english, thai, phonetic, example, category, difficulty, synonyms, created_by, created_at, updated_at)
         SELECT
-          acv.id,
-          acv.english,
-          acv.thai,
-          acv.phonetic,
-          acv.example,
-          COALESCE(acv.category, 'general'),
-          COALESCE(acv.difficulty, 2),
+          src.english,
+          src.thai,
+          src.phonetic,
+          src.example,
+          src.category,
+          src.difficulty,
           NULL::TEXT[],
-          acv.created_by,
-          COALESCE(acv.created_at, NOW()),
-          COALESCE(acv.updated_at, acv.created_at, NOW())
-        FROM admin_custom_vocabulary acv
+          src.created_by,
+          src.created_at,
+          src.updated_at
+        FROM (
+          SELECT DISTINCT ON (LOWER(acv.english))
+            acv.english,
+            acv.thai,
+            acv.phonetic,
+            acv.example,
+            COALESCE(acv.category, 'general') AS category,
+            COALESCE(acv.difficulty, 2) AS difficulty,
+            acv.created_by,
+            COALESCE(acv.created_at, NOW()) AS created_at,
+            COALESCE(acv.updated_at, acv.created_at, NOW()) AS updated_at
+          FROM admin_custom_vocabulary acv
+          ORDER BY LOWER(acv.english), COALESCE(acv.updated_at, acv.created_at, NOW()) DESC
+        ) src
         WHERE NOT EXISTS (
           SELECT 1
           FROM vocabulary v
-          WHERE LOWER(v.english) = LOWER(acv.english)
+          WHERE LOWER(v.english) = LOWER(src.english)
         );
 
         UPDATE vocabulary v

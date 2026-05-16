@@ -225,9 +225,13 @@ export default function GamePage() {
     return ids.map(id => wordById.get(id)).filter((w): w is VocabWord => Boolean(w))
   }
 
+  function expectedDeckSize(card: PlayableCard, cfg: QuizConfig = card.config) {
+    return card.learningStyle === "wide" ? 100 : Math.max(1, Number(cfg.size) || 10)
+  }
+
   async function ensureCardDeck(card: PlayableCard, cfg: QuizConfig = card.config) {
     const cached = preloadedDecks[card.id]
-    if(cached?.length) return cached
+    if(cached && cached.length >= expectedDeckSize(card, cfg)) return cached
 
     const data = await studyRequest<{ wordIds: string[]; state?: { cards: PlayableCard[]; examReadyIds: string[]; hideMasteryPrompt: boolean } }>({
       action:"ensure-deck",
@@ -262,6 +266,8 @@ export default function GamePage() {
       action:"add-card-word",
       cardId:wordManagerCard.id,
       wordId,
+      config:wordManagerCard.config,
+      learningStyle:wordManagerCard.learningStyle,
     })
     if(data?.state) applyStudyState(data.state)
     if(data?.wordIds) setWordManagerIds(data.wordIds)
@@ -275,6 +281,8 @@ export default function GamePage() {
       action:"remove-card-word",
       cardId:wordManagerCard.id,
       wordId,
+      config:wordManagerCard.config,
+      learningStyle:wordManagerCard.learningStyle,
     })
     if(data?.state) applyStudyState(data.state)
     if(data?.wordIds) setWordManagerIds(data.wordIds)
