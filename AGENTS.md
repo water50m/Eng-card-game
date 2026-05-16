@@ -13,7 +13,7 @@ When the user asks to finish changes with the project deploy flow, run these ste
 2. `git commit`
 3. `git push`
 4. `ssh gotdev@myserver`
-5. `cd Eng_card_game`
+5. `cd ~/apps/Eng-card-game`
 6. `deploy`
 
 Use a concise commit message that summarizes the completed change when the user does not provide one.
