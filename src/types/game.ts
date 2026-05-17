@@ -27,7 +27,7 @@ export const QUIZ_CATEGORIES: { id:QuizCategory; label:string; emoji:string; des
   { id:"all",           label:"คละทั้งหมด",      emoji:"🎲", desc:"สุ่มจากทุกหมวด" },
   { id:"daily-life",    label:"ชีวิตประจำวัน",   emoji:"🏠", desc:"คำที่ใช้ทุกวัน" },
   { id:"fruits",        label:"ผลไม้",           emoji:"🍎", desc:"ผลไม้และพืชผล" },
-  { id:"top-3000",      label:"3000 คำต้องรู้",  emoji:"📚", desc:"คำศัพท์พื้นฐาน" },
+  { id:"top-3000",      label:"3000 คำที่ใช้บ่อยสุด", emoji:"📚", desc:"คำที่เจอบ่อยและควรรู้เป็นฐานหลัก" },
   { id:"engineering",   label:"วิศวกรรม",         emoji:"⚙️", desc:"คำเฉพาะทาง" },
   { id:"reading-manga", label:"อ่านการ์ตูน",      emoji:"📕", desc:"มังงะ/อนิเมะ" },
   { id:"reading-novel", label:"อ่านนิยาย",        emoji:"📖", desc:"นิยายภาษาอังกฤษ" },
