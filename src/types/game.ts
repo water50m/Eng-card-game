@@ -22,8 +22,9 @@ export const MARK_FREQ: Record<MarkLevel, string> = {
   3: "ไม่โผล่อีก",
 }
 
-export type QuizCategory = "all"|"daily-life"|"fruits"|"top-3000"|"engineering"|"reading-manga"|"reading-novel"|"reading-news"|"custom"
-export const QUIZ_CATEGORIES: { id:QuizCategory; label:string; emoji:string; desc:string }[] = [
+export type QuizCategory = string
+export type QuizCategoryOption = { id:QuizCategory; label:string; emoji:string; desc:string; count?:number }
+export const QUIZ_CATEGORIES: QuizCategoryOption[] = [
   { id:"all",           label:"คละทั้งหมด",      emoji:"🎲", desc:"สุ่มจากทุกหมวด" },
   { id:"daily-life",    label:"ชีวิตประจำวัน",   emoji:"🏠", desc:"คำที่ใช้ทุกวัน" },
   { id:"fruits",        label:"ผลไม้",           emoji:"🍎", desc:"ผลไม้และพืชผล" },

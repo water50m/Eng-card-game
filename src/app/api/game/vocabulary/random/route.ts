@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/database'
 import { withAuth } from '@/lib/middleware'
+import { ensureVocabularySchema } from '@/lib/vocabularySchema'
 
 export async function GET(request: NextRequest) {
   const authResult = await withAuth(request)
@@ -24,9 +25,13 @@ export async function GET(request: NextRequest) {
   params.push(userId)
   conditions.push("(up.is_mastered IS NULL OR up.is_mastered = false)")
 
-  if (category) { 
-    params.push(category); 
-    conditions.push(`v.category = $${params.length}`) 
+  if (category && category !== "all") {
+    if (category === "custom") {
+      conditions.push("v.created_by IS NOT NULL")
+    } else {
+      params.push(category); 
+      conditions.push(`v.category = $${params.length}`)
+    }
   }
   if (difficulty) { 
     params.push(parseInt(difficulty)); 
@@ -44,6 +49,7 @@ export async function GET(request: NextRequest) {
   query += " ORDER BY RANDOM() LIMIT 1"
 
   try {
+    await ensureVocabularySchema()
     const result = await pool.query(query, params)
     
     if (result.rows.length === 0) {

@@ -1,4 +1,5 @@
 import pool from "@/lib/database"
+import { QUIZ_CATEGORIES } from "@/types/game"
 
 type VocabularyInput = {
   english: string
@@ -122,6 +123,110 @@ async function initializeVocabularySchema() {
 
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_vocabulary_category_id ON vocabulary(category, id)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_vocabulary_created_by ON vocabulary(created_by)`)
+  await ensureVocabularyCategoryTable()
+}
+
+async function ensureVocabularyCategoryTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS vocabulary_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '📚',
+      description TEXT NOT NULL DEFAULT '',
+      sort_order INTEGER NOT NULL DEFAULT 100,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+
+  const baseCategories = [
+    ...QUIZ_CATEGORIES.filter(category => category.id !== "all"),
+    { id: "animals", label: "สัตว์", emoji: "🦁", desc: "สัตว์และสิ่งมีชีวิต" },
+    { id: "food", label: "อาหาร", emoji: "🍜", desc: "อาหาร เครื่องดื่ม และวัตถุดิบ" },
+    { id: "colors", label: "สี", emoji: "🎨", desc: "สีและลักษณะสี" },
+    { id: "numbers", label: "จำนวน", emoji: "🔢", desc: "ตัวเลข ปริมาณ และเศษส่วน" },
+    { id: "verbs", label: "กริยา", emoji: "⚡", desc: "คำกริยาและการกระทำ" },
+    { id: "adjectives", label: "คุณศัพท์", emoji: "✨", desc: "คำบอกลักษณะ" },
+    { id: "places", label: "สถานที่", emoji: "🗺️", desc: "สถานที่และพื้นที่" },
+    { id: "general", label: "ทั่วไป", emoji: "📌", desc: "คำศัพท์ทั่วไป" },
+  ]
+
+  await pool.query(
+    `
+      INSERT INTO vocabulary_categories (id, name, emoji, description, sort_order, updated_at)
+      SELECT c.id, c.name, c.emoji, c.description, c.sort_order, NOW()
+      FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::int[])
+        AS c(id, name, emoji, description, sort_order)
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        emoji = EXCLUDED.emoji,
+        description = EXCLUDED.description,
+        sort_order = LEAST(vocabulary_categories.sort_order, EXCLUDED.sort_order),
+        updated_at = NOW()
+    `,
+    [
+      baseCategories.map(category => category.id),
+      baseCategories.map(category => category.label),
+      baseCategories.map(category => category.emoji),
+      baseCategories.map(category => category.desc),
+      baseCategories.map((_, index) => (index + 1) * 10),
+    ],
+  )
+
+  await pool.query(`
+    INSERT INTO vocabulary_categories (id, name, emoji, description, sort_order)
+    SELECT
+      category_id,
+      INITCAP(REPLACE(category_id, '-', ' ')),
+      '📚',
+      'คำในหมวด ' || category_id,
+      500
+    FROM (
+      SELECT DISTINCT COALESCE(NULLIF(category, ''), 'general') AS category_id
+      FROM vocabulary
+    ) categories
+    WHERE category_id <> 'custom'
+    ON CONFLICT (id) DO NOTHING
+  `)
+}
+
+export async function listVocabularyCategories() {
+  await ensureVocabularySchema()
+
+  const totalResult = await pool.query<{ count: number }>(
+    "SELECT COUNT(*)::int AS count FROM vocabulary",
+  )
+  const categoriesResult = await pool.query<{
+    id: string
+    label: string
+    emoji: string
+    desc: string
+    count: number
+  }>(`
+    WITH counts AS (
+      SELECT COALESCE(NULLIF(category, ''), 'general') AS id, COUNT(*)::int AS count
+      FROM vocabulary
+      GROUP BY COALESCE(NULLIF(category, ''), 'general')
+      UNION ALL
+      SELECT 'custom' AS id, COUNT(*)::int AS count
+      FROM vocabulary
+      WHERE created_by IS NOT NULL
+    )
+    SELECT
+      vc.id,
+      vc.name AS label,
+      vc.emoji,
+      vc.description AS desc,
+      COALESCE(counts.count, 0)::int AS count
+    FROM vocabulary_categories vc
+    LEFT JOIN counts ON counts.id = vc.id
+    ORDER BY vc.sort_order ASC, vc.name ASC
+  `)
+
+  return [
+    { id: "all", label: "คละทั้งหมด", emoji: "🎲", desc: "สุ่มจากทุกหมวด", count: totalResult.rows[0]?.count ?? 0 },
+    ...categoriesResult.rows,
+  ]
 }
 
 export async function upsertVocabularyWord(word: VocabularyInput) {

@@ -1,7 +1,7 @@
 // english-card-game/src/lib/api.ts
 // src/lib/api.ts — Frontend API client
 
-import type { VocabWord } from "@/types/game"
+import type { QuizCategoryOption, VocabWord } from "@/types/game"
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
 
@@ -62,7 +62,7 @@ export const api = {
       if (params?.excludeIds?.length) qs.set("excludeIds", params.excludeIds.join(","))
       return request<{ word: VocabWord; options: string[] }>(`/api/game/vocabulary/random?${qs}`)
     },
-    themes: () => request<{ category: string; count: number }[]>("/api/game/vocabulary/themes"),
+    themes: () => request<QuizCategoryOption[]>("/api/game/vocabulary/themes"),
     submitAnswer: (body: { wordId: string; correct: boolean; timeMs: number; sessionId?: string }) =>
       request<{ correct: boolean; isMastered: boolean; newStreak: number; xpEarned: number; accuracy: number }>(
         "/api/game/submit-answer", { method: "POST", body: JSON.stringify(body) }

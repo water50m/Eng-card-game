@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   VocabWord, WordProgress, MarkLevel, Difficulty,
-  MARK_ICONS, QuizConfig,
+  MARK_ICONS, QuizCategoryOption, QuizConfig, QUIZ_CATEGORIES,
 } from "../../types/game"
 import { QuizTemplate } from "../../types/template"
 import { SEED_VOCABULARY } from "../../data/vocabulary"
@@ -80,8 +80,10 @@ export default function GamePage() {
   useEffect(()=>setMounted(true),[])
 
   const [allWords,setAllWords] = useState<VocabWord[]>(SEED_VOCABULARY)
+  const [categoryOptions,setCategoryOptions] = useState<QuizCategoryOption[]>(QUIZ_CATEGORIES)
   const [studyStateLoaded,setStudyStateLoaded] = useState(false)
   const wordById = useMemo(()=>new Map(allWords.map(w => [w.id, w])),[allWords])
+  const categoryLabelById = useMemo(()=>new Map(categoryOptions.map(c => [c.id, c.label])),[categoryOptions])
   const allThai    = useMemo(()=>allWords.map(w=>w.thai),[allWords])
   const allEnglish = useMemo(()=>allWords.map(w=>w.english),[allWords])
 
@@ -221,6 +223,30 @@ export default function GamePage() {
     }
   },[mounted,studyStateLoaded])
 
+  useEffect(()=>{
+    if(!mounted || !studyStateLoaded) return
+
+    const controller = new AbortController()
+    const token = getToken()
+    if(!token) return
+
+    fetch("/api/game/vocabulary/themes", {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if(Array.isArray(data) && data.length > 0) setCategoryOptions(data)
+      })
+      .catch(error => {
+        if((error as Error).name !== "AbortError") {
+          console.error("โหลดหมวดคำศัพท์ไม่สำเร็จ:", error)
+        }
+      })
+
+    return () => controller.abort()
+  },[mounted,studyStateLoaded])
+
   function wordsFromIds(ids: string[]) {
     return ids.map(id => wordById.get(id)).filter((w): w is VocabWord => Boolean(w))
   }
@@ -275,11 +301,11 @@ export default function GamePage() {
     if(data?.words) setWordManagerWords(data.words.map(toVocabWord))
   }
 
-  async function randomWordForManagedCard() {
+  async function randomWordForManagedCard(category: string) {
     if(!wordManagerCard) return null
     const data = await studyRequest<{ word?: ApiVocabWord | null }>({
       action:"random-card-word",
-      category:wordManagerCard.config.category,
+      category,
       excludeIds:wordManagerIds,
     })
     return data?.word ? toVocabWord(data.word) : null
@@ -541,7 +567,7 @@ export default function GamePage() {
       <AnimatePresence>{showConfig&&(
         <ConfigModal config={config} onChange={setConfig}
           onUseNow={handleUseConfig} onSaveNew={()=>{setShowConfig(false);setShowSaveTpl(true)}}
-          onClose={()=>setShowConfig(false)} isFirstWord={true} allWords={allWords}/>
+          onClose={()=>setShowConfig(false)} isFirstWord={true} allWords={allWords} categoryOptions={categoryOptions}/>
       )}</AnimatePresence>
       <AnimatePresence>{showSaveTpl&&(
         <SaveTemplatePopup config={config} onSave={handleSaveTemplate} onCancel={()=>setShowSaveTpl(false)}/>
@@ -554,6 +580,7 @@ export default function GamePage() {
           card={wordManagerCard}
           words={wordManagerWords}
           allWords={allWords}
+          categoryOptions={categoryOptions}
           loading={wordManagerLoading}
           onClose={()=>setWordManagerCard(null)}
           onAddWord={addWordToManagedCard}
@@ -633,6 +660,7 @@ export default function GamePage() {
           card={wordManagerCard}
           words={wordManagerWords}
           allWords={allWords}
+          categoryOptions={categoryOptions}
           loading={wordManagerLoading}
           onClose={()=>setWordManagerCard(null)}
           onAddWord={addWordToManagedCard}
@@ -644,7 +672,7 @@ export default function GamePage() {
       <AnimatePresence>{showConfig&&(
         <ConfigModal config={config} onChange={setConfig}
           onUseNow={handleUseConfig} onSaveNew={()=>{setShowConfig(false);setShowSaveTpl(true)}}
-          onClose={()=>setShowConfig(false)} isFirstWord={isFirst} allWords={allWords}/>
+          onClose={()=>setShowConfig(false)} isFirstWord={isFirst} allWords={allWords} categoryOptions={categoryOptions}/>
       )}</AnimatePresence>
       <AnimatePresence>{showSaveTpl&&(
         <SaveTemplatePopup config={config} onSave={handleSaveTemplate} onCancel={()=>setShowSaveTpl(false)}/>
@@ -729,7 +757,7 @@ export default function GamePage() {
               boxShadow:feedback==="correct"?"0 0 28px var(--color-success)44":feedback==="wrong"?"0 0 28px var(--color-danger)44":"0 0 40px var(--accent-glow)",
             }}>
             <div style={{position:"absolute",top:"11px",left:"13px",display:"flex",alignItems:"center" as const,gap:"5px"}}>
-              <span style={{fontSize:"10px",color:"var(--text-muted)",textTransform:"capitalize" as const,fontFamily:"var(--font-body)"}}>{currentWord.category}</span>
+              <span style={{fontSize:"10px",color:"var(--text-muted)",textTransform:"capitalize" as const,fontFamily:"var(--font-body)"}}>{categoryLabelById.get(currentWord.category) ?? currentWord.category}</span>
               <span style={{fontSize:"12px"}}>{MARK_ICONS[markLv]}</span>
             </div>
             <div style={{position:"absolute",top:"13px",right:"13px",display:"flex",gap:"3px"}}>

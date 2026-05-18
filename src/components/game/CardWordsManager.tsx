@@ -2,26 +2,35 @@
 
 import { useMemo, useState } from "react"
 import { motion } from "framer-motion"
-import type { VocabWord } from "@/types/game"
+import { QUIZ_CATEGORIES, type QuizCategoryOption, type VocabWord } from "@/types/game"
 import type { PlayableCard } from "@/lib/studyCards"
 
-export function CardWordsManager({ card, words, allWords, loading, onClose, onAddWord, onRandomWord, onRemoveWord }: {
+export function CardWordsManager({ card, words, allWords, categoryOptions = QUIZ_CATEGORIES, loading, onClose, onAddWord, onRandomWord, onRemoveWord }: {
   card: PlayableCard
   words: VocabWord[]
   allWords: VocabWord[]
+  categoryOptions?: QuizCategoryOption[]
   loading: boolean
   onClose: () => void
   onAddWord: (wordId: string) => void | Promise<void>
-  onRandomWord?: () => Promise<VocabWord | null>
+  onRandomWord?: (category: string) => Promise<VocabWord | null>
   onRemoveWord: (wordId: string) => void
 }) {
   const [search, setSearch] = useState("")
   const [selectedWord, setSelectedWord] = useState<VocabWord | null>(null)
   const [adding, setAdding] = useState(false)
+  const [randomCategory, setRandomCategory] = useState(card.config.category || "all")
   const currentIds = useMemo(() => new Set(words.map(w => w.id)), [words])
-  const randomCandidates = useMemo(() => allWords.filter(w => !currentIds.has(w.id)), [allWords, currentIds])
+  const randomCandidates = useMemo(() => allWords
+    .filter(w => !currentIds.has(w.id))
+    .filter(w => {
+      if (randomCategory === "all") return true
+      if (randomCategory === "custom") return Boolean(w.isUserWord)
+      return w.category === randomCategory
+    }), [allWords, currentIds, randomCategory])
   const randomDisabled = loading || adding || (!onRandomWord && randomCandidates.length === 0)
   const activeLimit = Math.max(1, Number(card.config?.size) || 10)
+  const selectableCategories = categoryOptions.length > 0 ? categoryOptions : QUIZ_CATEGORIES
   const results = search.trim().length >= 2
     ? allWords
       .filter(w => !currentIds.has(w.id))
@@ -38,7 +47,7 @@ export function CardWordsManager({ card, words, allWords, loading, onClose, onAd
     if (loading || adding) return
     setAdding(true)
     const word = onRandomWord
-      ? await onRandomWord()
+      ? await onRandomWord(randomCategory)
       : randomCandidates[Math.floor(Math.random() * randomCandidates.length)] ?? null
     setAdding(false)
     if (!word) return
@@ -75,7 +84,7 @@ export function CardWordsManager({ card, words, allWords, loading, onClose, onAd
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "20px", lineHeight: 1 }}>✕</button>
         </div>
 
-        <div style={{ display: "flex", gap: "8px", alignItems: "stretch", marginBottom: "16px" }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "stretch", marginBottom: "10px" }}>
           <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
             <input
               value={search}
@@ -100,6 +109,21 @@ export function CardWordsManager({ card, words, allWords, loading, onClose, onAd
             style={{ padding: "0 15px", borderRadius: "12px", border: "1px solid var(--border-default)", background: loading || adding || !selectedWord || currentIds.has(selectedWord.id) ? "var(--bg-subtle)" : "var(--accent-primary)", color: loading || adding || !selectedWord || currentIds.has(selectedWord.id) ? "var(--text-muted)" : "var(--text-on-accent)", fontFamily: "var(--font-body)", fontSize: "14px", fontWeight: 700, cursor: loading || adding || !selectedWord || currentIds.has(selectedWord.id) ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
             {adding ? "เพิ่ม..." : "เพิ่ม"}
           </button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "8px", alignItems: "stretch", marginBottom: "16px" }}>
+          <select
+            value={randomCategory}
+            onChange={e => setRandomCategory(e.target.value)}
+            title="เลือกหมวดที่จะสุ่ม"
+            style={{ minWidth: 0, width: "100%", padding: "10px 12px", borderRadius: "12px", border: "1px solid var(--border-default)", background: "var(--bg-surface)", color: "var(--text-primary)", fontFamily: "var(--font-body)", fontSize: "13px", outline: "none" }}
+          >
+            {selectableCategories.map(category => (
+              <option key={category.id} value={category.id}>
+                {category.emoji} {category.label}{typeof category.count === "number" ? ` (${category.count})` : ""}
+              </option>
+            ))}
+          </select>
           <button onClick={addRandomWord} disabled={randomDisabled} title="สุ่มคำใหม่เข้า card"
             style={{ padding: "0 15px", borderRadius: "12px", border: "1px solid var(--border-default)", background: randomDisabled ? "var(--bg-subtle)" : "var(--accent-primary)", color: randomDisabled ? "var(--text-muted)" : "var(--text-on-accent)", fontFamily: "var(--font-body)", fontSize: "14px", fontWeight: 700, cursor: randomDisabled ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
             {adding ? "สุ่ม..." : "🎲 สุ่ม"}

@@ -70,6 +70,7 @@ export function TemplateGrid({ cards, onSelect, onUseTemplate, onConfigure, onMa
   const allTags = [...new Set(allTpls.flatMap(t => t.tags))].slice(0, 12)
   const modeLabel: Record<GameMode, string> = { "multiple-choice": "MC", "think-reveal": "T&R", "timed-reveal": "T&R Timed", timed: "Timed", typing: "Type", invert: "Invert" }
   const catEmoji = Object.fromEntries(QUIZ_CATEGORIES.map(c => [c.id, c.emoji]))
+  const catLabel = Object.fromEntries(QUIZ_CATEGORIES.map(c => [c.id, c.label]))
   const cardWithDifficulty = (card: PlayableCard) => {
     if (card.source !== "system") return card
     const difficulty = STYLE_DIFFICULTIES[styleDifficulty[card.id] ?? 1]
@@ -154,7 +155,7 @@ export function TemplateGrid({ cards, onSelect, onUseTemplate, onConfigure, onMa
                 </div>
               )}
               <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginBottom: "10px" }}>
-                <Chip>{catEmoji[effectiveCard.config.category] ?? ""} {QUIZ_CATEGORIES.find(c => c.id === effectiveCard.config.category)?.label}</Chip>
+                <Chip>{catEmoji[effectiveCard.config.category] ?? "📚"} {catLabel[effectiveCard.config.category] ?? effectiveCard.config.category}</Chip>
                 <Chip>📝 {effectiveCard.config.size} คำ</Chip>
                 <Chip>{t.learningStyle === "wide" ? "กว้างขวาง" : t.learningStyle === "fast" ? "ฉับไว" : "คลาสสิก"}</Chip>
                 <Chip>{modeLabel[effectiveCard.config.mode]}</Chip>

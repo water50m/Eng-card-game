@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pool from '@/lib/database'
 import { withAuth } from '@/lib/middleware'
+import { listVocabularyCategories } from '@/lib/vocabularySchema'
 
 export async function GET(request: NextRequest) {
   const authResult = await withAuth(request)
@@ -10,11 +10,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await pool.query(
-      "SELECT category, COUNT(*) as count FROM vocabulary GROUP BY category ORDER BY count DESC"
-    )
-    
-    return NextResponse.json(result.rows)
+    return NextResponse.json(await listVocabularyCategories())
   } catch (error) {
     console.error('Themes error:', error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

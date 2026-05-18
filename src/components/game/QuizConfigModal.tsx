@@ -3,7 +3,7 @@
 import { useState } from "react"
 import type React from "react"
 import { motion } from "framer-motion"
-import type { GameMode, QuizConfig, VocabWord } from "@/types/game"
+import type { GameMode, QuizCategoryOption, QuizConfig, VocabWord } from "@/types/game"
 import { QUIZ_CATEGORIES, QUIZ_SIZES } from "@/types/game"
 import { Ico } from "./GameIcons"
 import { Label, Toggle } from "./GameUi"
@@ -17,7 +17,7 @@ const MODES: { id: GameMode; label: string; emoji: string }[] = [
   { id: "invert", label: "TH→EN Invert", emoji: "🔄" },
 ]
 
-export function ConfigModal({ config, onChange, onUseNow, onSaveNew, onClose, isFirstWord, allWords }: {
+export function ConfigModal({ config, onChange, onUseNow, onSaveNew, onClose, isFirstWord, allWords, categoryOptions = QUIZ_CATEGORIES }: {
   config: QuizConfig
   onChange: (c: QuizConfig) => void
   onUseNow: () => void
@@ -25,6 +25,7 @@ export function ConfigModal({ config, onChange, onUseNow, onSaveNew, onClose, is
   onClose: () => void
   isFirstWord: boolean
   allWords: VocabWord[]
+  categoryOptions?: QuizCategoryOption[]
 }) {
   const [wordSearch, setWordSearch] = useState("")
   const [pickedWords, setPickedWords] = useState<VocabWord[]>([])
@@ -68,10 +69,11 @@ export function ConfigModal({ config, onChange, onUseNow, onSaveNew, onClose, is
 
         <Label>หมวดคำศัพท์</Label>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "7px", marginBottom: "18px" }}>
-          {QUIZ_CATEGORIES.map(c => (
+          {categoryOptions.map(c => (
             <button key={c.id} onClick={() => onChange({ ...config, category: c.id })} style={pill(config.category === c.id)} title={c.desc}>
               <span style={{ fontSize: "17px" }}>{c.emoji}</span>
               <span style={{ textAlign: "center", lineHeight: 1.3 }}>{c.label}</span>
+              {typeof c.count === "number" && <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", opacity: 0.7 }}>{c.count}</span>}
             </button>
           ))}
         </div>
