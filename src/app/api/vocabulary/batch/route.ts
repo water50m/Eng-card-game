@@ -10,11 +10,13 @@ type BatchWord = {
   example?: string
   category?: string
   difficulty?: number
+  synonyms?: string[]
 }
 
 type ValidWord = Required<Pick<BatchWord, 'english' | 'thai' | 'category' | 'difficulty'>> & {
   phonetic: string | null
   example: string | null
+  synonyms: string[] | null
 }
 
 export async function POST(request: NextRequest) {
@@ -70,13 +72,18 @@ export async function POST(request: NextRequest) {
         continue
       }
 
+      const synonyms = Array.isArray(word.synonyms)
+        ? word.synonyms.map(synonym => synonym.trim()).filter(Boolean)
+        : []
+
       validWords.push({
         english: word.english,
         thai: word.thai,
         phonetic: word.phonetic || null,
         example: word.example || null,
         category: word.category || 'general',
-        difficulty: word.difficulty || 2
+        difficulty: word.difficulty || 2,
+        synonyms: synonyms.length > 0 ? synonyms : null
       })
     }
 

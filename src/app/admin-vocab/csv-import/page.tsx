@@ -6,8 +6,9 @@ import { NavBar } from "../../../components/NavBar"
 import { VocabWord, Difficulty } from "../../../types/game"
 
 // ── CSV column map ─────────────────────────────────────────────
-// id, e-search, e-entry, t-entry, e-cat, t-related, e-syn, e-ant
-// We map: e-entry→english, t-entry→thai, e-cat→category, e-syn→synonyms
+// Supports both:
+// 1) id, e-search, e-entry, t-entry, e-cat, t-related, e-syn, e-ant
+// 2) id, english, thai, phonetic, example, category, difficulty, synonyms, ...
 const CAT_MAP: Record<string,string> = {
   DET:"determiner", N:"nouns", V:"verbs", ADJ:"adjectives",
   ADV:"adverbs", PREP:"prepositions", CONJ:"conjunctions",
@@ -16,46 +17,60 @@ const CAT_MAP: Record<string,string> = {
 }
 
 function parseCsv(text: string): { rows: Partial<VocabWord>[]; errors: string[] } {
-  const lines   = text.trim().split(/\r?\n/)
+  const records = parseCsvRecords(text)
   const errors: string[] = []
   const rows:   Partial<VocabWord>[] = []
 
-  if (!lines.length) return { rows, errors: ["ไฟล์ว่างเปล่า"] }
+  if (!records.length) return { rows, errors: ["ไฟล์ว่างเปล่า"] }
 
-  // Detect header
-  const header = lines[0].toLowerCase()
-  const hasHeader = header.includes("e-entry") || header.includes("english") || header.includes("e-search")
-  const dataLines = hasHeader ? lines.slice(1) : lines
+  const headerCells = records[0].map(normalizeHeader)
+  const hasHeader = headerCells.some(header => ["e-entry", "english", "e-search"].includes(header))
+  const dataRecords = hasHeader ? records.slice(1) : records
+  const headerIndex = new Map<string, number>()
 
-  dataLines.forEach((line, i) => {
-    if (!line.trim()) return
-    // Handle quoted CSV fields
-    const cols = parseCsvLine(line)
+  if (hasHeader) {
+    headerCells.forEach((header, index) => headerIndex.set(header, index))
+  }
+
+  dataRecords.forEach((cols, i) => {
+    if (cols.every(col => !col.trim())) return
     if (cols.length < 4) {
-      errors.push(`แถว ${i + 2}: คอลัมน์ไม่ครบ (${cols.length} คอลัมน์)`)
+      errors.push(`แถว ${i + (hasHeader ? 2 : 1)}: คอลัมน์ไม่ครบ (${cols.length} คอลัมน์)`)
       return
     }
 
-    // id, e-search, e-entry, t-entry, e-cat, t-related, e-syn, e-ant
-    const [, , english, thai, cat, , syn] = cols
+    const rowNumber = i + (hasHeader ? 2 : 1)
+    const isStandardFormat = hasHeader && headerIndex.has("english") && headerIndex.has("thai")
+    const get = (header: string) => {
+      const index = headerIndex.get(header)
+      return index === undefined ? "" : cols[index] ?? ""
+    }
+
+    const english = isStandardFormat ? get("english") : cols[2]
+    const thai = isStandardFormat ? get("thai") : cols[3]
+
     if (!english?.trim() || !thai?.trim()) {
-      errors.push(`แถว ${i + 2}: english หรือ thai ว่างเปล่า`)
+      errors.push(`แถว ${rowNumber}: english หรือ thai ว่างเปล่า`)
       return
     }
 
-    const rawCat = cat?.trim().toUpperCase() ?? ""
-    const category = CAT_MAP[rawCat] ?? rawCat.toLowerCase() ?? "general"
+    const rawCat = (isStandardFormat ? get("category") : cols[4])?.trim() ?? ""
+    const legacyCat = rawCat.toUpperCase()
+    const category = isStandardFormat
+      ? rawCat || "general"
+      : CAT_MAP[legacyCat] ?? legacyCat.toLowerCase() ?? "general"
 
-    const synonyms = syn?.trim()
-      ? syn.split(/[,;|]/).map(s => s.trim()).filter(Boolean)
-      : undefined
+    const difficulty = parseDifficulty(isStandardFormat ? get("difficulty") : "")
+    const synonyms = parseSynonyms(isStandardFormat ? get("synonyms") : cols[6])
 
     rows.push({
-      id:       `csv-${Date.now()}-${i}`,
-      english:  english.trim(),
-      thai:     thai.trim(),
+      id: `csv-${Date.now()}-${i}`,
+      english: english.trim(),
+      thai: thai.trim(),
+      phonetic: cleanOptional(isStandardFormat ? get("phonetic") : ""),
+      example: cleanOptional(isStandardFormat ? get("example") : ""),
       category,
-      difficulty: 1 as Difficulty,
+      difficulty,
       synonyms,
     })
   })
@@ -63,17 +78,116 @@ function parseCsv(text: string): { rows: Partial<VocabWord>[]; errors: string[] 
   return { rows, errors }
 }
 
-function parseCsvLine(line: string): string[] {
-  const cols: string[] = []
-  let cur = "", inQuote = false
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i]
-    if (c === '"') { inQuote = !inQuote }
-    else if (c === "," && !inQuote) { cols.push(cur); cur = "" }
-    else { cur += c }
+function parseCsvRecords(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let field = ""
+  let inQuote = false
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    const next = text[i + 1]
+
+    if (inQuote) {
+      if (char === '"' && next === '"') {
+        field += '"'
+        i++
+      } else if (char === '"') {
+        inQuote = false
+      } else {
+        field += char
+      }
+      continue
+    }
+
+    if (char === '"' && field === "") {
+      inQuote = true
+    } else if (char === ",") {
+      row.push(field)
+      field = ""
+    } else if (char === "\n" || char === "\r") {
+      row.push(field)
+      field = ""
+      rows.push(row)
+      row = []
+      if (char === "\r" && next === "\n") i++
+    } else {
+      field += char
+    }
   }
-  cols.push(cur)
-  return cols
+
+  row.push(field)
+  rows.push(row)
+
+  return rows.filter(record => record.some(cell => cell.trim()))
+}
+
+function normalizeHeader(header: string): string {
+  return header.replace(/^\uFEFF/, "").trim().toLowerCase()
+}
+
+function cleanOptional(value: string): string | undefined {
+  const trimmed = value.trim()
+  return trimmed ? trimmed : undefined
+}
+
+function parseDifficulty(value: string): Difficulty {
+  const parsed = Number.parseInt(value.trim(), 10)
+  if ([1, 2, 3, 4, 5].includes(parsed)) return parsed as Difficulty
+  return 1 as Difficulty
+}
+
+function parseSynonyms(value: string): string[] | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    return parsePostgresTextArray(trimmed.slice(1, -1))
+  }
+
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => String(item).trim()).filter(Boolean)
+      }
+    } catch {
+      // Fall back to delimiter parsing below.
+    }
+  }
+
+  return trimmed.split(/[,;|]/).map(s => s.trim()).filter(Boolean)
+}
+
+function parsePostgresTextArray(value: string): string[] | undefined {
+  const items: string[] = []
+  let current = ""
+  let inQuote = false
+  let escaping = false
+
+  for (const char of value) {
+    if (escaping) {
+      current += char
+      escaping = false
+    } else if (char === "\\" && inQuote) {
+      escaping = true
+    } else if (char === '"') {
+      inQuote = !inQuote
+    } else if (char === "," && !inQuote) {
+      items.push(current.trim())
+      current = ""
+    } else {
+      current += char
+    }
+  }
+
+  items.push(current.trim())
+
+  const synonyms = items
+    .map(item => item.replace(/^"(.*)"$/, "$1").trim())
+    .filter(item => item && item.toUpperCase() !== "NULL")
+
+  return synonyms.length ? synonyms : undefined
 }
 
 // ── Duplicate detector ──────────────────────────────────────────
@@ -317,7 +431,7 @@ export default function CsvImportPage() {
           </h1>
         </div>
         <p style={{fontFamily:"var(--font-body)",fontSize:"13px",color:"var(--text-muted)",margin:"0 0 24px"}}>
-          รองรับ format: <code style={{background:"var(--bg-subtle)",padding:"1px 6px",borderRadius:"4px"}}>id, e-search, e-entry, t-entry, e-cat, t-related, e-syn, e-ant</code>
+          รองรับ format: <code style={{background:"var(--bg-subtle)",padding:"1px 6px",borderRadius:"4px"}}>id, english, thai, phonetic, example, category, difficulty, synonyms</code> และ <code style={{background:"var(--bg-subtle)",padding:"1px 6px",borderRadius:"4px"}}>id, e-search, e-entry, t-entry, e-cat, t-related, e-syn, e-ant</code>
         </p>
 
         {/* Tabs */}
@@ -376,7 +490,7 @@ export default function CsvImportPage() {
                   value={rawCsv}
                   onChange={e=>setRawCsv(e.target.value)}
                   rows={8}
-                  placeholder={"id,e-search,e-entry,t-entry,e-cat,t-related,e-syn,e-ant\n0,a,a,หนึ่ง,DET,,,"}
+                  placeholder={"id,english,thai,phonetic,example,category,difficulty,synonyms\n0227cec7-6517-4527-9366-39d7e55c3c3a,Absurd,\"น่าหัวร่อพิลึก, ไร้สาระสิ้นดี\",แอบเซิร์ด,It is absurd to go out in this heavy rain.,away use,1,\"{\"\"silly\"\",\"\"ridiculous\"\"}\""}
                   style={{
                     width:"100%",padding:"12px",borderRadius:"12px",
                     border:"1px solid var(--border-default)",background:"var(--bg-surface)",
