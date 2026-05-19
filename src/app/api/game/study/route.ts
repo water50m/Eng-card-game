@@ -347,7 +347,7 @@ export async function POST(request: NextRequest) {
         "UPDATE study_cards SET play_count = play_count + 1, updated_at = NOW() WHERE id = $1 AND user_id = $2",
         [body.cardId, userId],
       ).catch(error => console.error("Update play count error:", error))
-      return NextResponse.json({ wordIds: ids })
+      return NextResponse.json({ wordIds: ids, words: await getWordsByIds(ids) })
     }
 
     if (body.action === "get-card-words") {
@@ -419,7 +419,7 @@ export async function POST(request: NextRequest) {
         await pool.query("DELETE FROM study_card_words WHERE user_id = $1 AND card_id = $2 AND word_id = $3", [userId, body.cardId, body.wordId])
         const ids = await fillDeck(userId, body.cardId, body.config, body.learningStyle, { useQueuedWordsBeforeRandom: true })
         await setDeckTarget(userId, body.cardId, ids.length)
-        return NextResponse.json({ wordIds: ids, examReadyIds: await listExamReadyIds(userId) })
+        return NextResponse.json({ wordIds: ids, words: await getWordsByIds(ids), examReadyIds: await listExamReadyIds(userId) })
       }
 
       return NextResponse.json({ examReadyIds: await listExamReadyIds(userId) })

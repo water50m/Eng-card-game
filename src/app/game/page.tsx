@@ -54,6 +54,18 @@ type ApiVocabWord = {
   isUserWord?: boolean
 }
 
+type StudyStateResponse = {
+  cards: PlayableCard[]
+  examReadyIds: string[]
+  hideMasteryPrompt: boolean
+}
+
+type DeckWordsResponse = {
+  wordIds: string[]
+  words?: ApiVocabWord[]
+  state?: StudyStateResponse
+}
+
 function shuffleWords(words: VocabWord[]) {
   return [...words].sort(() => Math.random() - 0.5)
 }
@@ -80,6 +92,7 @@ export default function GamePage() {
   useEffect(()=>setMounted(true),[])
 
   const [allWords,setAllWords] = useState<VocabWord[]>(SEED_VOCABULARY)
+  const wordCacheRef = useRef<Map<string,VocabWord>>(new Map(SEED_VOCABULARY.map(w => [w.id, w])))
   const [categoryOptions,setCategoryOptions] = useState<QuizCategoryOption[]>(QUIZ_CATEGORIES)
   const [studyStateLoaded,setStudyStateLoaded] = useState(false)
   const wordById = useMemo(()=>new Map(allWords.map(w => [w.id, w])),[allWords])
@@ -105,6 +118,7 @@ export default function GamePage() {
   const [wordManagerWords,setWordManagerWords] = useState<VocabWord[]>([])
   const [wordManagerLoading,setWordManagerLoading] = useState(false)
   const [preloadedDecks,setPreloadedDecks] = useState<Record<string,string[]>>({})
+  const [preloadedDeckWords,setPreloadedDeckWords] = useState<Record<string,VocabWord[]>>({})
 
   // Quiz state
   const [quizActive,setQuizActive]   = useState(false)
@@ -150,6 +164,31 @@ export default function GamePage() {
   function getToken() {
     if (typeof window === "undefined") return null
     return localStorage.getItem("ecg-token")
+  }
+
+  function replaceAllWords(words: VocabWord[]) {
+    wordCacheRef.current = new Map(words.map(word => [word.id, word]))
+    setAllWords(words)
+  }
+
+  function mergeWordsIntoAllWords(words: VocabWord[]) {
+    if(words.length === 0) return
+
+    for(const word of words) {
+      wordCacheRef.current.set(word.id, word)
+    }
+
+    setAllWords(prev => {
+      const next = new Map(prev.map(word => [word.id, word]))
+      for(const word of words) next.set(word.id, word)
+      return Array.from(next.values())
+    })
+  }
+
+  function cacheDeckWords(cardId: string, words: VocabWord[]) {
+    if(words.length === 0) return
+    setPreloadedDeckWords(prev => ({...prev, [cardId]:words}))
+    mergeWordsIntoAllWords(words)
   }
 
   function applyStudyState(data: { cards?: PlayableCard[]; examReadyIds?: string[]; hideMasteryPrompt?: boolean; decks?: Record<string,string[]> }) {
@@ -208,7 +247,7 @@ export default function GamePage() {
 
         const data = await res.json()
         if(Array.isArray(data) && data.length > 0) {
-          setAllWords((data as ApiVocabWord[]).map(toVocabWord))
+          replaceAllWords((data as ApiVocabWord[]).map(toVocabWord))
         }
       } catch (error) {
         if((error as Error).name !== "AbortError") {
@@ -247,8 +286,10 @@ export default function GamePage() {
     return () => controller.abort()
   },[mounted,studyStateLoaded])
 
-  function wordsFromIds(ids: string[]) {
-    return ids.map(id => wordById.get(id)).filter((w): w is VocabWord => Boolean(w))
+  function wordsFromIds(ids: string[], extraWords: VocabWord[] = []) {
+    const lookup = new Map(wordCacheRef.current)
+    for(const word of extraWords) lookup.set(word.id, word)
+    return ids.map(id => lookup.get(id) ?? wordById.get(id)).filter((w): w is VocabWord => Boolean(w))
   }
 
   function expectedDeckSize(card: PlayableCard, cfg: QuizConfig = card.config) {
@@ -257,9 +298,13 @@ export default function GamePage() {
 
   async function ensureCardDeck(card: PlayableCard, cfg: QuizConfig = card.config) {
     const cached = preloadedDecks[card.id]
-    if(cached && cached.length >= expectedDeckSize(card, cfg)) return cached
+    const expectedSize = expectedDeckSize(card, cfg)
+    if(cached && cached.length >= expectedSize) {
+      const cachedWords = wordsFromIds(cached, preloadedDeckWords[card.id] ?? [])
+      if(cachedWords.length >= Math.min(cached.length, expectedSize)) return { wordIds:cached, words:cachedWords }
+    }
 
-    const data = await studyRequest<{ wordIds: string[]; state?: { cards: PlayableCard[]; examReadyIds: string[]; hideMasteryPrompt: boolean } }>({
+    const data = await studyRequest<DeckWordsResponse>({
       action:"ensure-deck",
       cardId:card.id,
       config:cfg,
@@ -267,28 +312,36 @@ export default function GamePage() {
     })
     if(data?.state) applyStudyState(data.state)
     if(data?.wordIds) setPreloadedDecks(prev => ({...prev, [card.id]:data.wordIds}))
-    return data?.wordIds ?? shuffleWords(allWords).slice(0, cfg.size).map(w=>w.id)
+    const fetchedWords = data?.words?.map(toVocabWord) ?? []
+    if(fetchedWords.length) cacheDeckWords(card.id, fetchedWords)
+
+    return {
+      wordIds:data?.wordIds ?? shuffleWords(allWords).slice(0, cfg.size).map(w=>w.id),
+      words:fetchedWords,
+    }
   }
 
   async function openWordManager(card: PlayableCard) {
     setWordManagerCard(card)
     setWordManagerLoading(true)
-    const data = await studyRequest<{ wordIds: string[]; words?: ApiVocabWord[]; state?: { cards: PlayableCard[]; examReadyIds: string[]; hideMasteryPrompt: boolean } }>({
+    const data = await studyRequest<DeckWordsResponse>({
       action:"get-card-words",
       cardId:card.id,
       config:card.config,
       learningStyle:card.learningStyle,
     })
     if(data?.state) applyStudyState(data.state)
+    const fetchedWords = data?.words?.map(toVocabWord) ?? []
+    if(fetchedWords.length) cacheDeckWords(card.id, fetchedWords)
     setWordManagerIds(data?.wordIds ?? [])
-    setWordManagerWords(data?.words?.length ? data.words.map(toVocabWord) : wordsFromIds(data?.wordIds ?? []))
+    setWordManagerWords(fetchedWords.length ? fetchedWords : wordsFromIds(data?.wordIds ?? [], preloadedDeckWords[card.id] ?? []))
     if(data?.wordIds) setPreloadedDecks(prev => ({...prev, [card.id]:data.wordIds}))
     setWordManagerLoading(false)
   }
 
   async function addWordToManagedCard(wordId: string) {
     if(!wordManagerCard) return
-    const data = await studyRequest<{ wordIds: string[]; words?: ApiVocabWord[]; state?: { cards: PlayableCard[]; examReadyIds: string[]; hideMasteryPrompt: boolean } }>({
+    const data = await studyRequest<DeckWordsResponse>({
       action:"add-card-word",
       cardId:wordManagerCard.id,
       wordId,
@@ -298,7 +351,11 @@ export default function GamePage() {
     if(data?.state) applyStudyState(data.state)
     if(data?.wordIds) setWordManagerIds(data.wordIds)
     if(data?.wordIds) setPreloadedDecks(prev => ({...prev, [wordManagerCard.id]:data.wordIds}))
-    if(data?.words) setWordManagerWords(data.words.map(toVocabWord))
+    if(data?.words) {
+      const fetchedWords = data.words.map(toVocabWord)
+      cacheDeckWords(wordManagerCard.id, fetchedWords)
+      setWordManagerWords(fetchedWords)
+    }
   }
 
   async function randomWordForManagedCard(category: string) {
@@ -308,12 +365,15 @@ export default function GamePage() {
       category,
       excludeIds:wordManagerIds,
     })
-    return data?.word ? toVocabWord(data.word) : null
+    if(!data?.word) return null
+    const word = toVocabWord(data.word)
+    mergeWordsIntoAllWords([word])
+    return word
   }
 
   async function removeWordFromManagedCard(wordId: string) {
     if(!wordManagerCard) return
-    const data = await studyRequest<{ wordIds: string[]; words?: ApiVocabWord[]; state?: { cards: PlayableCard[]; examReadyIds: string[]; hideMasteryPrompt: boolean } }>({
+    const data = await studyRequest<DeckWordsResponse>({
       action:"remove-card-word",
       cardId:wordManagerCard.id,
       wordId,
@@ -323,13 +383,17 @@ export default function GamePage() {
     if(data?.state) applyStudyState(data.state)
     if(data?.wordIds) setWordManagerIds(data.wordIds)
     if(data?.wordIds) setPreloadedDecks(prev => ({...prev, [wordManagerCard.id]:data.wordIds}))
-    if(data?.words) setWordManagerWords(data.words.map(toVocabWord))
+    if(data?.words) {
+      const fetchedWords = data.words.map(toVocabWord)
+      cacheDeckWords(wordManagerCard.id, fetchedWords)
+      setWordManagerWords(fetchedWords)
+    }
     setQuizQueue(q => wordManagerCard.id === activeCard?.id ? q.filter(w => w.id !== wordId) : q)
   }
 
   async function markWordReady(wordId: string) {
     if(!activeCard) return
-    const data = await studyRequest<{ wordIds?: string[]; examReadyIds?: string[]; state?: { cards: PlayableCard[]; examReadyIds: string[]; hideMasteryPrompt: boolean } }>({
+    const data = await studyRequest<{ wordIds?: string[]; words?: ApiVocabWord[]; examReadyIds?: string[]; state?: StudyStateResponse }>({
       action:"mark-ready",
       wordId,
       cardId:activeCard.id,
@@ -340,7 +404,9 @@ export default function GamePage() {
     if(data?.state) applyStudyState(data.state)
     if(data?.wordIds) {
       setPreloadedDecks(prev => ({...prev, [activeCard.id]:data.wordIds!}))
-      const refreshedWords = wordsFromIds(data.wordIds)
+      const fetchedWords = data.words?.map(toVocabWord) ?? []
+      if(fetchedWords.length) cacheDeckWords(activeCard.id, fetchedWords)
+      const refreshedWords = wordsFromIds(data.wordIds, fetchedWords.length ? fetchedWords : preloadedDeckWords[activeCard.id] ?? [])
       setQuizQueue(q => {
         const activeIds = new Set(q.map(w=>w.id))
         const additions = refreshedWords.filter(w => !activeIds.has(w.id))
@@ -351,8 +417,8 @@ export default function GamePage() {
 
   async function buildQueue(card:PlayableCard, cfg:QuizConfig, words?:VocabWord[]):Promise<VocabWord[]> {
     if(words) return shuffleWords(words).slice(0, cfg.size)
-    const deckIds = await ensureCardDeck(card, cfg)
-    const deckWords = wordsFromIds(deckIds).slice(0, Math.max(1, Number(cfg.size) || 10))
+    const deck = await ensureCardDeck(card, cfg)
+    const deckWords = wordsFromIds(deck.wordIds, deck.words).slice(0, Math.max(1, Number(cfg.size) || 10))
     if(deckWords.length === 0) return shuffleWords(allWords).slice(0, cfg.size)
     const available = deckWords.filter(w => {
       const p=progress.get(w.id); const m=(p?.markLevel??0) as MarkLevel
@@ -387,7 +453,7 @@ export default function GamePage() {
   }
 
   function loadWord(word:VocabWord, cfg:QuizConfig=config) {
-    setCurrentWord(word); setOptions(buildOptions(word,allWords))
+    setCurrentWord(word); setOptions(buildOptions(word,Array.from(wordCacheRef.current.values())))
     setSelected(null); setRevealed(false); setFeedback(null); setMasteredNow(false)
     wordStart.current=Date.now()
     if(cfg.mode==="timed"||cfg.mode==="timed-reveal"){ setTimeLeft(TIMED_SECONDS); setTimerActive(true) }
