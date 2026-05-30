@@ -8,7 +8,7 @@ import { QUIZ_CATEGORIES } from "@/types/game"
 import type { QuizTemplate } from "@/types/template"
 import { DEFAULT_TEMPLATES, getLikedIds, getPinnedIds, toggleLike, togglePin } from "@/types/template"
 import type { PlayableCard, StyleDifficulty } from "@/lib/studyCards"
-import { BASE_STYLE_CARDS, DEFAULT_STYLE_DIFFICULTY, normalizeCard } from "@/lib/studyCards"
+import { BASE_STYLE_CARDS, DEFAULT_STYLE_DIFFICULTY, STORY_CARDS, normalizeCard } from "@/lib/studyCards"
 import { Chip } from "./GameUi"
 
 const STYLE_DIFFICULTIES: Record<StyleDifficulty, { label: string; desc: string; mode: GameMode; hintsEnabled: boolean }> = {
@@ -18,13 +18,14 @@ const STYLE_DIFFICULTIES: Record<StyleDifficulty, { label: string; desc: string;
   4: { label: "Reveal + Timed", desc: "คิดเองก่อนเฉลยเหมือนเดิม แต่มีเวลาบีบให้ตัดสินใจเร็วขึ้น", mode: "timed-reveal", hintsEnabled: false },
 }
 
-export function TemplateGrid({ cards, styleDifficulty, onSelect, onUseTemplate, onConfigure, onManageWords, onStyleDifficultyChange }: {
+export function TemplateGrid({ cards, styleDifficulty, onSelect, onUseTemplate, onConfigure, onManageWords, onOpenStory, onStyleDifficultyChange }: {
   cards: PlayableCard[]
   styleDifficulty: Record<string, StyleDifficulty>
   onSelect: (t: PlayableCard) => void
   onUseTemplate: (t: QuizTemplate) => void
   onConfigure: (t: PlayableCard) => void
   onManageWords: (t: PlayableCard) => void
+  onOpenStory: (t: PlayableCard) => void
   onStyleDifficultyChange: (cardId: string, level: StyleDifficulty) => void
 }) {
   const [filter, setFilter] = useState<"all" | "global" | "mine" | "liked">("all")
@@ -48,7 +49,7 @@ export function TemplateGrid({ cards, styleDifficulty, onSelect, onUseTemplate, 
   }
 
   const previewTpls: PlayableCard[] = DEFAULT_TEMPLATES.map(t => normalizeCard(t, "fast", "template"))
-  const allTpls = [...BASE_STYLE_CARDS, ...cards, ...previewTpls]
+  const allTpls = [...BASE_STYLE_CARDS, ...STORY_CARDS, ...cards, ...previewTpls]
   const filtered = allTpls.filter(t => {
     if (filter === "global" && t.source !== "system") return false
     if (filter === "mine" && t.source !== "user") return false
@@ -101,14 +102,16 @@ export function TemplateGrid({ cards, styleDifficulty, onSelect, onUseTemplate, 
           const isPinned = pinned.includes(t.id)
           const isLiked = liked.includes(t.id)
           const isPreview = t.source === "template"
+          const isStory = Boolean(t.story)
           const effectiveCard = cardWithDifficulty(t)
           const selectedDifficulty = styleDifficulty[t.id] ?? DEFAULT_STYLE_DIFFICULTY[t.id] ?? 1
           const difficultyInfo = STYLE_DIFFICULTIES[selectedDifficulty]
+          const storyWords = t.story?.vocabulary.length ?? 0
           return (
             <motion.div key={t.id}
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
               whileHover={{ y: -2, boxShadow: isPinned ? "0 8px 28px var(--accent-glow)" : "0 6px 20px rgba(0,0,0,0.15)" }}
-              onClick={() => isPreview ? onUseTemplate(t) : onSelect(effectiveCard)}
+              onClick={() => isPreview ? onUseTemplate(t) : isStory ? onOpenStory(effectiveCard) : onSelect(effectiveCard)}
               style={{
                 background: isLiked ? "var(--bg-subtle)" : "var(--bg-surface)",
                 border: `2px solid ${isPreview ? "#cbd5e1" : isPinned ? "var(--accent-primary)" : "var(--border-default)"}`,
@@ -120,11 +123,11 @@ export function TemplateGrid({ cards, styleDifficulty, onSelect, onUseTemplate, 
                 gridColumn: t.source === "system" ? "span 2" : undefined,
                 minHeight: t.source === "system" ? "220px" : undefined,
               }}>
-              {isPreview ? <Badge secondary>ตัวอย่าง Template</Badge> : isPinned ? <Badge>📌 ปักหมุด</Badge> : null}
+              {isPreview ? <Badge secondary>ตัวอย่าง Template</Badge> : isStory ? <Badge>เรื่องเล่า</Badge> : isPinned ? <Badge>📌 ปักหมุด</Badge> : null}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
                 <span style={{ fontSize: "26px" }}>{t.emoji}</span>
                 <div style={{ display: "flex", gap: "4px" }} onClick={e => e.stopPropagation()}>
-                  {!isPreview && <IconButton onClick={e => { e.stopPropagation(); onManageWords(t) }} title="จัดการคำใน card">📚</IconButton>}
+                  {!isPreview && !isStory && <IconButton onClick={e => { e.stopPropagation(); onManageWords(t) }} title="จัดการคำใน card">📚</IconButton>}
                   {!isPreview && <IconButton onClick={e => { e.stopPropagation(); onConfigure(t) }} title="ตั้งค่าการ์ด">⚙️</IconButton>}
                   <IconButton active={isLiked} onClick={e => handleLike(e, t.id)} title="ถูกใจ">{isLiked ? "❤️" : "🤍"}</IconButton>
                   {!isPreview && <IconButton active={isPinned} onClick={e => handlePin(e, t.id)} title="ปักหมุด">{isPinned ? "📌" : "📍"}</IconButton>}
@@ -152,14 +155,15 @@ export function TemplateGrid({ cards, styleDifficulty, onSelect, onUseTemplate, 
               )}
               <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginBottom: "10px" }}>
                 <Chip>{catEmoji[effectiveCard.config.category] ?? "📚"} {catLabel[effectiveCard.config.category] ?? effectiveCard.config.category}</Chip>
-                <Chip>📝 {effectiveCard.config.size} คำ</Chip>
+                <Chip>📝 {isStory ? Math.min(effectiveCard.config.size, storyWords) : effectiveCard.config.size} คำ</Chip>
+                {isStory && <Chip>{t.story?.length === "long" ? "เรื่องยาว" : "เรื่องสั้น"}</Chip>}
                 <Chip>{t.learningStyle === "wide" ? "กว้างขวาง" : t.learningStyle === "fast" ? "ฉับไว" : "คลาสสิก"}</Chip>
                 <Chip>{modeLabel[effectiveCard.config.mode]}</Chip>
                 {effectiveCard.config.hintsEnabled && <Chip>💡</Chip>}
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--text-muted)" }}>▶ {t.playCount.toLocaleString()}</span>
-                <span style={{ padding: "5px 14px", borderRadius: "9999px", background: isPreview ? "#f1f5f9" : "var(--accent-primary)", color: isPreview ? "#64748b" : "var(--text-on-accent)", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 600, border: isPreview ? "1px solid #cbd5e1" : "none" }}>{isPreview ? "สร้างจากใบนี้" : "เล่น"}</span>
+                <span style={{ padding: "5px 14px", borderRadius: "9999px", background: isPreview ? "#f1f5f9" : "var(--accent-primary)", color: isPreview ? "#64748b" : "var(--text-on-accent)", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 600, border: isPreview ? "1px solid #cbd5e1" : "none" }}>{isPreview ? "สร้างจากใบนี้" : isStory ? "อ่าน" : "เล่น"}</span>
               </div>
             </motion.div>
           )

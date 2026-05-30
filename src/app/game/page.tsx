@@ -36,6 +36,7 @@ import {
   MarkBar,
   StopWarnModal,
   CardWordsManager,
+  StoryReaderModal,
 } from "../../components/game"
 
 // ─── constants ───────────────────────────────────────────────
@@ -118,6 +119,7 @@ export default function GamePage() {
   const [styleDifficulty,setStyleDifficulty] = useState<Record<string,StyleDifficulty>>(DEFAULT_STYLE_DIFFICULTY)
   const [masteryPrompt,setMasteryPrompt] = useState<MasteryPrompt|null>(null)
   const [studyCards,setStudyCards] = useState<PlayableCard[]>([])
+  const [storyReaderCard,setStoryReaderCard] = useState<PlayableCard|null>(null)
   const [wordManagerCard,setWordManagerCard] = useState<PlayableCard|null>(null)
   const [wordManagerIds,setWordManagerIds] = useState<string[]>([])
   const [wordManagerWords,setWordManagerWords] = useState<VocabWord[]>([])
@@ -399,6 +401,12 @@ export default function GamePage() {
 
   async function markWordReady(wordId: string) {
     if(!activeCard) return
+    if(activeCard.story) {
+      setExamReadyIds(prev => prev.includes(wordId) ? prev : [...prev, wordId])
+      setQuizQueue(q => q.filter(w => w.id !== wordId).slice(0, activeCard.config.size))
+      return
+    }
+
     const data = await studyRequest<{ wordIds?: string[]; words?: ApiVocabWord[]; examReadyIds?: string[]; state?: StudyStateResponse }>({
       action:"mark-ready",
       wordId,
@@ -423,6 +431,16 @@ export default function GamePage() {
 
   async function buildQueue(card:PlayableCard, cfg:QuizConfig, words?:VocabWord[]):Promise<VocabWord[]> {
     if(words) return shuffleWords(words).slice(0, cfg.size)
+    if(card.story) {
+      mergeWordsIntoAllWords(card.story.vocabulary)
+      const available = card.story.vocabulary.filter(w => {
+        const p=progress.get(w.id); const m=(p?.markLevel??0) as MarkLevel
+        return m < 2 && !examReadyIds.includes(w.id)
+      })
+      const pool = available.length > 0 ? available : card.story.vocabulary
+      return shuffleWords(pool).slice(0, Math.min(cfg.size, pool.length))
+    }
+
     const deck = await ensureCardDeck(card, cfg)
     const deckWords = wordsFromIds(deck.wordIds, deck.words).slice(0, Math.max(1, Number(cfg.size) || 10))
     if(deckWords.length === 0) return shuffleWords(allWords).slice(0, cfg.size)
@@ -598,6 +616,13 @@ export default function GamePage() {
 
   async function handleUseConfig() {
     setShowConfig(false)
+    if(activeCard?.story) {
+      const updated = {...activeCard, config}
+      setActiveCard(updated)
+      if(isFirst) queueStartQuiz(updated, config)
+      return
+    }
+
     if(activeCard?.source === "user") {
       const updated = {...activeCard, config}
       setActiveCard(updated)
@@ -618,6 +643,32 @@ export default function GamePage() {
     })
     if(data) applyStudyState(data)
   }
+
+  function openStoryReader(card: PlayableCard) {
+    setStoryReaderCard(card)
+    setActiveCard(card)
+    setConfig(card.config)
+    if(card.story) mergeWordsIntoAllWords(card.story.vocabulary)
+  }
+
+  function closeStoryReader() {
+    const cardId = storyReaderCard?.id
+    setStoryReaderCard(null)
+    if(activeCard?.id === cardId) {
+      setActiveCard(null)
+      setConfig(BASE_STYLE_CARDS[0].config)
+    }
+  }
+
+  function configureStory(card: PlayableCard) {
+    setStoryReaderCard(null)
+    setActiveCard(card)
+    setConfig(card.config)
+    setShowConfig(true)
+  }
+
+  const storyCategoryOptions: QuizCategoryOption[] = [{ id:"story", label:"คำในเรื่อง", emoji:"📖", desc:"ใช้เฉพาะคำศัพท์จากเรื่องเล่านี้", count:activeCard?.story?.vocabulary.length }]
+  const activeCategoryOptions = activeCard?.story ? storyCategoryOptions : categoryOptions
 
   async function handleExamPassed(wordIds: string[]) {
     const data = await studyRequest<{ cards?: PlayableCard[]; examReadyIds?: string[]; hideMasteryPrompt?: boolean }>({
@@ -660,7 +711,15 @@ export default function GamePage() {
       <AnimatePresence>{showConfig&&(
         <ConfigModal config={config} onChange={setConfig}
           onUseNow={handleUseConfig} onSaveNew={()=>{setShowConfig(false);setShowSaveTpl(true)}}
-          onClose={()=>setShowConfig(false)} isFirstWord={true} allWords={allWords} categoryOptions={categoryOptions}/>
+          onClose={()=>setShowConfig(false)} isFirstWord={!activeCard?.story} allWords={allWords} categoryOptions={activeCategoryOptions}/>
+      )}</AnimatePresence>
+      <AnimatePresence>{storyReaderCard&&(
+        <StoryReaderModal
+          card={storyReaderCard}
+          onClose={closeStoryReader}
+          onStart={()=>{ setStoryReaderCard(null); queueStartQuiz(storyReaderCard, storyReaderCard.config) }}
+          onConfigure={()=>configureStory(storyReaderCard)}
+        />
       )}</AnimatePresence>
       <AnimatePresence>{showSaveTpl&&(
         <SaveTemplatePopup config={config} onSave={handleSaveTemplate} onCancel={()=>setShowSaveTpl(false)}/>
@@ -690,7 +749,7 @@ export default function GamePage() {
             </h1>
             <p style={{fontFamily:"var(--font-body)",fontSize:"14px",color:"var(--text-muted)",margin:0}}>
               กดเล่นได้เลย หรือ&nbsp;
-              <button onClick={()=>setShowConfig(true)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--accent-primary)",fontFamily:"var(--font-body)",fontSize:"14px",padding:0,textDecoration:"underline"}}>
+              <button onClick={()=>{ setActiveCard(null); setConfig(BASE_STYLE_CARDS[0].config); setShowConfig(true) }} style={{background:"none",border:"none",cursor:"pointer",color:"var(--accent-primary)",fontFamily:"var(--font-body)",fontSize:"14px",padding:0,textDecoration:"underline"}}>
                 ตั้งค่าเอง
               </button>
             </p>
@@ -722,6 +781,7 @@ export default function GamePage() {
           onUseTemplate={t=>{ setPendingTemplate(t); setConfig(t.config); setShowSaveTpl(true) }}
           onConfigure={t=>{ setActiveCard(t); setConfig(t.config); setShowConfig(true) }}
           onManageWords={openWordManager}
+          onOpenStory={openStoryReader}
           onStyleDifficultyChange={handleStyleDifficultyChange}
         />
       </main>
@@ -767,7 +827,7 @@ export default function GamePage() {
       <AnimatePresence>{showConfig&&(
         <ConfigModal config={config} onChange={setConfig}
           onUseNow={handleUseConfig} onSaveNew={()=>{setShowConfig(false);setShowSaveTpl(true)}}
-          onClose={()=>setShowConfig(false)} isFirstWord={isFirst} allWords={allWords} categoryOptions={categoryOptions}/>
+          onClose={()=>setShowConfig(false)} isFirstWord={isFirst && !activeCard?.story} allWords={allWords} categoryOptions={activeCategoryOptions}/>
       )}</AnimatePresence>
       <AnimatePresence>{showSaveTpl&&(
         <SaveTemplatePopup config={config} onSave={handleSaveTemplate} onCancel={()=>setShowSaveTpl(false)}/>
