@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import type React from "react"
+import { createPortal } from "react-dom"
 import { motion } from "framer-motion"
 import type { PlayableCard, StoryGlossaryItem } from "@/lib/studyCards"
 import { Ico } from "./GameIcons"
@@ -16,10 +17,27 @@ export function StoryReaderModal({ card, onClose, onStart, onConfigure }: {
   const story = card.story
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [pinnedId, setPinnedId] = useState<string | null>(null)
+  const [popupAnchor, setPopupAnchor] = useState<GlossaryPopupAnchor | null>(null)
   const matchers = useMemo(() => story ? buildGlossaryMatchers(story.vocabulary) : [], [story])
   if (!story) return null
   const idiomCount = story.vocabulary.filter(item => item.kind === "idiom").length
   const wordCount = story.vocabulary.length - idiomCount
+  const activePopupItem = popupAnchor ? story.vocabulary.find(item => item.id === popupAnchor.id) : undefined
+
+  const showGlossaryPopup = (event: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>, id: string) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const popupWidth = 260
+    const margin = 12
+    const rawLeft = rect.left + rect.width / 2
+    const left = Math.min(Math.max(rawLeft, popupWidth / 2 + margin), window.innerWidth - popupWidth / 2 - margin)
+    const placement = rect.top > 132 ? "above" : "below"
+    setPopupAnchor({
+      id,
+      left,
+      top: placement === "above" ? rect.top - 8 : rect.bottom + 8,
+      placement,
+    })
+  }
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -54,7 +72,7 @@ export function StoryReaderModal({ card, onClose, onStart, onConfigure }: {
               <h3 style={{ fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, color: "var(--accent-primary)", margin: "0 0 10px" }}>English</h3>
               {story.english.map((paragraph, index) => (
                 <p key={index} style={{ fontFamily: "var(--font-body)", fontSize: "14px", lineHeight: 1.65, color: "var(--text-primary)", margin: index === 0 ? "0 0 12px" : "12px 0" }}>
-                  {renderInteractiveText(paragraph, matchers, hoveredId, pinnedId, setHoveredId, setPinnedId)}
+                  {renderInteractiveText(paragraph, matchers, hoveredId, pinnedId, setHoveredId, setPinnedId, setPopupAnchor, showGlossaryPopup)}
                 </p>
               ))}
             </section>
@@ -77,9 +95,20 @@ export function StoryReaderModal({ card, onClose, onStart, onConfigure }: {
             </button>
           </div>
         </div>
+        {activePopupItem && popupAnchor && typeof document !== "undefined" && createPortal(
+          <GlossaryPopup item={activePopupItem} anchor={popupAnchor} />,
+          document.body,
+        )}
       </motion.div>
     </motion.div>
   )
+}
+
+type GlossaryPopupAnchor = {
+  id: string
+  left: number
+  top: number
+  placement: "above" | "below"
 }
 
 type GlossaryMatcher = {
@@ -118,6 +147,8 @@ function renderInteractiveText(
   pinnedId: string | null,
   setHoveredId: (id: string | null) => void,
   setPinnedId: (id: string | null) => void,
+  setPopupAnchor: (anchor: GlossaryPopupAnchor | null) => void,
+  showGlossaryPopup: (event: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>, id: string) => void,
 ) {
   const nodes: React.ReactNode[] = []
   let index = 0
@@ -135,10 +166,25 @@ function renderInteractiveText(
       <span key={`${match.item.id}-${index}`} style={{ position: "relative", display: "inline-block" }}>
         <button
           type="button"
-          onMouseEnter={() => setHoveredId(match.item.id)}
-          onMouseLeave={() => setHoveredId(null)}
+          onMouseEnter={event => {
+            setHoveredId(match.item.id)
+            showGlossaryPopup(event, match.item.id)
+          }}
+          onMouseLeave={() => {
+            setHoveredId(null)
+            if (pinnedId !== match.item.id) setPopupAnchor(null)
+          }}
+          onFocus={event => {
+            setHoveredId(match.item.id)
+            showGlossaryPopup(event, match.item.id)
+          }}
+          onBlur={() => {
+            setHoveredId(null)
+            if (pinnedId !== match.item.id) setPopupAnchor(null)
+          }}
           onClick={event => {
             event.stopPropagation()
+            showGlossaryPopup(event, match.item.id)
             setPinnedId(pinnedId === match.item.id ? null : match.item.id)
           }}
           title={`${match.item.thai}${match.item.kind === "idiom" ? " (สำนวน)" : ""}`}
@@ -157,7 +203,6 @@ function renderInteractiveText(
         >
           {label}
         </button>
-        {isActive && <GlossaryPopup item={match.item} />}
       </span>,
     )
     index += match.term.length
@@ -165,15 +210,16 @@ function renderInteractiveText(
   return nodes
 }
 
-function GlossaryPopup({ item }: { item: StoryGlossaryItem }) {
+function GlossaryPopup({ item, anchor }: { item: StoryGlossaryItem, anchor: GlossaryPopupAnchor }) {
   return (
     <span style={{
-      position: "absolute",
-      left: "50%",
-      bottom: "calc(100% + 8px)",
-      transform: "translateX(-50%)",
-      zIndex: 10,
-      width: "min(260px, 76vw)",
+      position: "fixed",
+      left: `${anchor.left}px`,
+      top: `${anchor.top}px`,
+      transform: anchor.placement === "above" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+      zIndex: 420,
+      width: "260px",
+      maxWidth: "calc(100vw - 24px)",
       padding: "10px 12px",
       borderRadius: "12px",
       border: "1px solid var(--border-default)",
