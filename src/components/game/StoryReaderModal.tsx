@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type React from "react"
 import { createPortal } from "react-dom"
 import { motion } from "framer-motion"
@@ -22,7 +22,21 @@ export function StoryReaderModal({ card, onClose, onStart, onConfigure }: {
   if (!story) return null
   const idiomCount = story.vocabulary.filter(item => item.kind === "idiom").length
   const wordCount = story.vocabulary.length - idiomCount
-  const activePopupItem = popupAnchor ? story.vocabulary.find(item => item.id === popupAnchor.id) : undefined
+  const activePopupItem = popupAnchor && (hoveredId === popupAnchor.id || pinnedId === popupAnchor.id)
+    ? story.vocabulary.find(item => item.id === popupAnchor.id)
+    : undefined
+
+  useEffect(() => {
+    if (!pinnedId) return
+    const closePinnedPopup = (event: PointerEvent) => {
+      const target = event.target as Element | null
+      if (target?.closest("[data-story-glossary-popup], [data-story-glossary-trigger]")) return
+      setPinnedId(null)
+      setPopupAnchor(null)
+    }
+    document.addEventListener("pointerdown", closePinnedPopup)
+    return () => document.removeEventListener("pointerdown", closePinnedPopup)
+  }, [pinnedId])
 
   const showGlossaryPopup = (event: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>, id: string) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -41,8 +55,7 @@ export function StoryReaderModal({ card, onClose, onStart, onConfigure }: {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.68)", zIndex: 210, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
-      onClick={onClose}>
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.68)", zIndex: 210, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
       <motion.div initial={{ scale: 0.94, y: 18 }} animate={{ scale: 1, y: 0 }} onClick={e => e.stopPropagation()}
         style={{ width: "100%", maxWidth: "780px", maxHeight: "92vh", overflowY: "auto", borderRadius: "18px", border: "1px solid var(--border-default)", background: "var(--bg-elevated)", boxShadow: "0 18px 60px rgba(0,0,0,0.35)" }}>
         <div style={{ position: "sticky", top: 0, zIndex: 2, display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start", padding: "18px 20px", background: "var(--bg-elevated)", borderBottom: "1px solid var(--border-default)" }}>
@@ -165,6 +178,7 @@ function renderInteractiveText(
     nodes.push(
       <span key={`${match.item.id}-${index}`} style={{ position: "relative", display: "inline-block" }}>
         <button
+          data-story-glossary-trigger="true"
           type="button"
           onMouseEnter={event => {
             setHoveredId(match.item.id)
@@ -184,8 +198,13 @@ function renderInteractiveText(
           }}
           onClick={event => {
             event.stopPropagation()
+            if (pinnedId === match.item.id) {
+              setPinnedId(null)
+              setPopupAnchor(null)
+              return
+            }
             showGlossaryPopup(event, match.item.id)
-            setPinnedId(pinnedId === match.item.id ? null : match.item.id)
+            setPinnedId(match.item.id)
           }}
           title={`${match.item.thai}${match.item.kind === "idiom" ? " (สำนวน)" : ""}`}
           style={{
@@ -212,7 +231,7 @@ function renderInteractiveText(
 
 function GlossaryPopup({ item, anchor }: { item: StoryGlossaryItem, anchor: GlossaryPopupAnchor }) {
   return (
-    <span style={{
+    <span data-story-glossary-popup="true" style={{
       position: "fixed",
       left: `${anchor.left}px`,
       top: `${anchor.top}px`,
@@ -230,7 +249,7 @@ function GlossaryPopup({ item, anchor }: { item: StoryGlossaryItem, anchor: Glos
       fontSize: "12px",
       lineHeight: 1.4,
       whiteSpace: "normal",
-      pointerEvents: "none",
+      pointerEvents: "auto",
     }}>
       <span style={{ display: "flex", justifyContent: "space-between", gap: "8px", marginBottom: "4px" }}>
         <strong style={{ color: "var(--accent-primary)" }}>{item.english}</strong>
