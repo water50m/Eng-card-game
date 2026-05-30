@@ -3,6 +3,7 @@ import pool from "@/lib/database"
 import { withAuth } from "@/lib/middleware"
 import { ensureStudySchema } from "@/lib/studySchema"
 import { ensureVocabularySchema } from "@/lib/vocabularySchema"
+import { normalizeStyleDifficulty } from "@/lib/studyCards"
 
 type StudyConfig = {
   category: string
@@ -262,6 +263,10 @@ async function getStudyState(userId: string) {
     "SELECT value FROM user_game_settings WHERE user_id = $1 AND key = 'hideMasteryPrompt'",
     [userId],
   )
+  const styleDifficultySetting = await pool.query<{ value: unknown }>(
+    "SELECT value FROM user_game_settings WHERE user_id = $1 AND key = 'styleDifficulty'",
+    [userId],
+  )
   const decks = await listExistingDecks(userId, ["style-fast", "style-wide"])
 
   return {
@@ -281,6 +286,7 @@ async function getStudyState(userId: string) {
     })),
     examReadyIds: readyIds,
     hideMasteryPrompt: promptSetting.rows[0]?.value === true,
+    styleDifficulty: normalizeStyleDifficulty(styleDifficultySetting.rows[0]?.value),
     decks,
   }
 }

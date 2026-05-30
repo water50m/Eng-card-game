@@ -7,11 +7,9 @@ import type { GameMode } from "@/types/game"
 import { QUIZ_CATEGORIES } from "@/types/game"
 import type { QuizTemplate } from "@/types/template"
 import { DEFAULT_TEMPLATES, getLikedIds, getPinnedIds, toggleLike, togglePin } from "@/types/template"
-import type { PlayableCard } from "@/lib/studyCards"
-import { BASE_STYLE_CARDS, normalizeCard } from "@/lib/studyCards"
+import type { PlayableCard, StyleDifficulty } from "@/lib/studyCards"
+import { BASE_STYLE_CARDS, DEFAULT_STYLE_DIFFICULTY, normalizeCard } from "@/lib/studyCards"
 import { Chip } from "./GameUi"
-
-type StyleDifficulty = 1 | 2 | 3 | 4
 
 const STYLE_DIFFICULTIES: Record<StyleDifficulty, { label: string; desc: string; mode: GameMode; hintsEnabled: boolean }> = {
   1: { label: "ปกติ", desc: "เริ่มแบบเบา มีตัวเลือกและคำใบ้ เหมาะกับคำใหม่", mode: "multiple-choice", hintsEnabled: true },
@@ -20,22 +18,20 @@ const STYLE_DIFFICULTIES: Record<StyleDifficulty, { label: string; desc: string;
   4: { label: "Reveal + Timed", desc: "คิดเองก่อนเฉลยเหมือนเดิม แต่มีเวลาบีบให้ตัดสินใจเร็วขึ้น", mode: "timed-reveal", hintsEnabled: false },
 }
 
-export function TemplateGrid({ cards, onSelect, onUseTemplate, onConfigure, onManageWords }: {
+export function TemplateGrid({ cards, styleDifficulty, onSelect, onUseTemplate, onConfigure, onManageWords, onStyleDifficultyChange }: {
   cards: PlayableCard[]
+  styleDifficulty: Record<string, StyleDifficulty>
   onSelect: (t: PlayableCard) => void
   onUseTemplate: (t: QuizTemplate) => void
   onConfigure: (t: PlayableCard) => void
   onManageWords: (t: PlayableCard) => void
+  onStyleDifficultyChange: (cardId: string, level: StyleDifficulty) => void
 }) {
   const [filter, setFilter] = useState<"all" | "global" | "mine" | "liked">("all")
   const [search, setSearch] = useState("")
   const [tag, setTag] = useState("")
   const [pinned, setPinned] = useState<string[]>([])
   const [liked, setLiked] = useState<string[]>([])
-  const [styleDifficulty, setStyleDifficulty] = useState<Record<string, StyleDifficulty>>({
-    "style-fast": 1,
-    "style-wide": 1,
-  })
 
   useEffect(() => {
     setPinned(getPinnedIds())
@@ -73,7 +69,7 @@ export function TemplateGrid({ cards, onSelect, onUseTemplate, onConfigure, onMa
   const catLabel = Object.fromEntries(QUIZ_CATEGORIES.map(c => [c.id, c.label]))
   const cardWithDifficulty = (card: PlayableCard) => {
     if (card.source !== "system") return card
-    const difficulty = STYLE_DIFFICULTIES[styleDifficulty[card.id] ?? 1]
+    const difficulty = STYLE_DIFFICULTIES[styleDifficulty[card.id] ?? DEFAULT_STYLE_DIFFICULTY[card.id] ?? 1]
     return { ...card, config: { ...card.config, mode: difficulty.mode, hintsEnabled: difficulty.hintsEnabled } }
   }
 
@@ -106,7 +102,7 @@ export function TemplateGrid({ cards, onSelect, onUseTemplate, onConfigure, onMa
           const isLiked = liked.includes(t.id)
           const isPreview = t.source === "template"
           const effectiveCard = cardWithDifficulty(t)
-          const selectedDifficulty = styleDifficulty[t.id] ?? 1
+          const selectedDifficulty = styleDifficulty[t.id] ?? DEFAULT_STYLE_DIFFICULTY[t.id] ?? 1
           const difficultyInfo = STYLE_DIFFICULTIES[selectedDifficulty]
           return (
             <motion.div key={t.id}
@@ -141,7 +137,7 @@ export function TemplateGrid({ cards, onSelect, onUseTemplate, onConfigure, onMa
                   <div style={{ display: "flex", gap: "5px", alignItems: "center", marginBottom: "5px", flexWrap: "wrap" }}>
                     <span style={{ fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 700, color: "var(--text-secondary)" }}>ระดับ</span>
                     {([1, 2, 3, 4] as const).map(level => (
-                      <button key={level} onClick={() => setStyleDifficulty(prev => ({ ...prev, [t.id]: level }))}
+                      <button key={level} onClick={() => onStyleDifficultyChange(t.id, level)}
                         title={STYLE_DIFFICULTIES[level].label}
                         style={{ width: "25px", height: "25px", borderRadius: "9999px", border: "1px solid", borderColor: level <= selectedDifficulty ? "#f59e0b" : "var(--border-default)", background: level <= selectedDifficulty ? "rgba(245,158,11,0.14)" : "var(--bg-subtle)", color: level <= selectedDifficulty ? "#f59e0b" : "var(--text-muted)", fontSize: "16px", lineHeight: 1, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
                         ★

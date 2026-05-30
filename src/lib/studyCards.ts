@@ -3,6 +3,24 @@ import { QuizTemplate, loadUserTemplates } from "@/types/template"
 
 export type LearningStyle = "fast" | "wide" | "classic"
 export type CardSource = "system" | "user" | "template"
+export type StyleDifficulty = 1 | 2 | 3 | 4
+
+export const DEFAULT_STYLE_DIFFICULTY: Record<string, StyleDifficulty> = {
+  "style-fast": 1,
+  "style-wide": 1,
+}
+
+export function normalizeStyleDifficulty(value: unknown): Record<string, StyleDifficulty> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return DEFAULT_STYLE_DIFFICULTY
+
+  return Object.entries(value).reduce<Record<string, StyleDifficulty>>((acc, [cardId, rawLevel]) => {
+    const level = Number(rawLevel)
+    if (Number.isInteger(level) && level >= 1 && level <= 4) {
+      acc[cardId] = level as StyleDifficulty
+    }
+    return acc
+  }, { ...DEFAULT_STYLE_DIFFICULTY })
+}
 
 export type PlayableCard = QuizTemplate & {
   learningStyle: LearningStyle

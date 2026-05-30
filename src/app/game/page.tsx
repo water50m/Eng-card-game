@@ -15,10 +15,13 @@ import { ConfettiCanvas } from "../../components/ConfettiCanvas"
 import { getOptionStyle } from "../../themes/themes"
 import {
   BASE_STYLE_CARDS,
+  DEFAULT_STYLE_DIFFICULTY,
   EXAM_UNLOCK_COUNT,
   MasteryPrompt,
   PlayableCard,
+  StyleDifficulty,
   normalizeCard,
+  normalizeStyleDifficulty,
   loadPlayableCards,
 } from "../../lib/studyCards"
 import {
@@ -58,6 +61,7 @@ type StudyStateResponse = {
   cards: PlayableCard[]
   examReadyIds: string[]
   hideMasteryPrompt: boolean
+  styleDifficulty: Record<string, StyleDifficulty>
 }
 
 type DeckWordsResponse = {
@@ -111,6 +115,7 @@ export default function GamePage() {
   const [examReadyIds,setExamReadyIds] = useState<string[]>([])
   const [showExam,setShowExam] = useState(false)
   const [hideMasteryPrompt,setHideMasteryPrompt] = useState(false)
+  const [styleDifficulty,setStyleDifficulty] = useState<Record<string,StyleDifficulty>>(DEFAULT_STYLE_DIFFICULTY)
   const [masteryPrompt,setMasteryPrompt] = useState<MasteryPrompt|null>(null)
   const [studyCards,setStudyCards] = useState<PlayableCard[]>([])
   const [wordManagerCard,setWordManagerCard] = useState<PlayableCard|null>(null)
@@ -191,10 +196,11 @@ export default function GamePage() {
     mergeWordsIntoAllWords(words)
   }
 
-  function applyStudyState(data: { cards?: PlayableCard[]; examReadyIds?: string[]; hideMasteryPrompt?: boolean; decks?: Record<string,string[]> }) {
+  function applyStudyState(data: { cards?: PlayableCard[]; examReadyIds?: string[]; hideMasteryPrompt?: boolean; styleDifficulty?: unknown; decks?: Record<string,string[]> }) {
     if(data.cards) setStudyCards(data.cards.map(c => normalizeCard(c, c.learningStyle, "user")))
     if(data.examReadyIds) setExamReadyIds(data.examReadyIds)
     if(typeof data.hideMasteryPrompt === "boolean") setHideMasteryPrompt(data.hideMasteryPrompt)
+    if(data.styleDifficulty) setStyleDifficulty(normalizeStyleDifficulty(data.styleDifficulty))
     if(data.decks) setPreloadedDecks(prev => ({...prev, ...data.decks}))
   }
 
@@ -218,7 +224,7 @@ export default function GamePage() {
 
   async function loadStudyState() {
     try {
-      const data = await studyRequest<{ cards: PlayableCard[]; examReadyIds: string[]; hideMasteryPrompt: boolean; decks?: Record<string,string[]> }>()
+      const data = await studyRequest<{ cards: PlayableCard[]; examReadyIds: string[]; hideMasteryPrompt: boolean; styleDifficulty?: Record<string,StyleDifficulty>; decks?: Record<string,string[]> }>()
       if(data) applyStudyState(data)
       else setStudyCards(loadPlayableCards())
     } finally {
@@ -512,7 +518,17 @@ export default function GamePage() {
       if(confirmed) {
         await markWordReady(currentWord.id)
       } else {
-        setProgress(p=>new Map(p).set(currentWord.id,{...newP,isMastered:false,markLevel:0 as MarkLevel}))
+        setMasteredNow(false)
+        setShowConfetti(false)
+        setProgress(p=>new Map(p).set(currentWord.id,{
+          wordId:currentWord.id,
+          streakCount:0,
+          attemptCount:0,
+          correctCount:0,
+          isMastered:false,
+          markLevel:0 as MarkLevel,
+          lastSeenAt:new Date(),
+        }))
       }
       scheduleNext(MASTERED_NEXT_DELAY)
       return
@@ -590,6 +606,17 @@ export default function GamePage() {
       return
     }
     if(isFirst) queueStartQuiz(activeCard ?? BASE_STYLE_CARDS[0], config)
+  }
+
+  async function handleStyleDifficultyChange(cardId: string, level: StyleDifficulty) {
+    const next = normalizeStyleDifficulty({...styleDifficulty, [cardId]:level})
+    setStyleDifficulty(next)
+    const data = await studyRequest<{ styleDifficulty?: Record<string,StyleDifficulty> }>({
+      action:"setting",
+      key:"styleDifficulty",
+      value:next,
+    })
+    if(data) applyStudyState(data)
   }
 
   async function handleExamPassed(wordIds: string[]) {
@@ -690,10 +717,12 @@ export default function GamePage() {
         </div>
         <TemplateGrid
           cards={studyCards}
+          styleDifficulty={styleDifficulty}
           onSelect={t=>queueStartQuiz(t,t.config)}
           onUseTemplate={t=>{ setPendingTemplate(t); setConfig(t.config); setShowSaveTpl(true) }}
           onConfigure={t=>{ setActiveCard(t); setConfig(t.config); setShowConfig(true) }}
           onManageWords={openWordManager}
+          onStyleDifficultyChange={handleStyleDifficultyChange}
         />
       </main>
     </div>
