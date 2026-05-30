@@ -67,7 +67,29 @@ async function initializeStudySchema() {
     )
   `)
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS story_cards (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '📖',
+      description TEXT NOT NULL DEFAULT '',
+      story_length TEXT NOT NULL DEFAULT 'short',
+      genre TEXT NOT NULL DEFAULT 'mystery',
+      english TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+      thai TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+      vocabulary JSONB NOT NULL DEFAULT '[]'::jsonb,
+      config JSONB NOT NULL DEFAULT '{}'::jsonb,
+      tags TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_by TEXT,
+      play_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_study_card_words_card ON study_card_words(user_id, card_id, position)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_ready_words_status ON exam_ready_words(user_id, status)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_vocabulary_category_id ON vocabulary(category, id)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_story_cards_active ON story_cards(is_active, created_at DESC)`)
 }

@@ -18,8 +18,9 @@ const STYLE_DIFFICULTIES: Record<StyleDifficulty, { label: string; desc: string;
   4: { label: "Reveal + Timed", desc: "คิดเองก่อนเฉลยเหมือนเดิม แต่มีเวลาบีบให้ตัดสินใจเร็วขึ้น", mode: "timed-reveal", hintsEnabled: false },
 }
 
-export function TemplateGrid({ cards, styleDifficulty, onSelect, onUseTemplate, onConfigure, onManageWords, onOpenStory, onStyleDifficultyChange }: {
+export function TemplateGrid({ cards, storyCards = [], styleDifficulty, onSelect, onUseTemplate, onConfigure, onManageWords, onOpenStory, onStyleDifficultyChange }: {
   cards: PlayableCard[]
+  storyCards?: PlayableCard[]
   styleDifficulty: Record<string, StyleDifficulty>
   onSelect: (t: PlayableCard) => void
   onUseTemplate: (t: QuizTemplate) => void
@@ -49,7 +50,7 @@ export function TemplateGrid({ cards, styleDifficulty, onSelect, onUseTemplate, 
   }
 
   const previewTpls: PlayableCard[] = DEFAULT_TEMPLATES.map(t => normalizeCard(t, "fast", "template"))
-  const allTpls = [...BASE_STYLE_CARDS, ...STORY_CARDS, ...cards, ...previewTpls]
+  const allTpls = [...BASE_STYLE_CARDS, ...STORY_CARDS, ...storyCards, ...cards, ...previewTpls]
   const filtered = allTpls.filter(t => {
     if (filter === "global" && t.source !== "system") return false
     if (filter === "mine" && t.source !== "user") return false
@@ -155,7 +156,7 @@ export function TemplateGrid({ cards, styleDifficulty, onSelect, onUseTemplate, 
               )}
               <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginBottom: "10px" }}>
                 <Chip>{catEmoji[effectiveCard.config.category] ?? "📚"} {catLabel[effectiveCard.config.category] ?? effectiveCard.config.category}</Chip>
-                <Chip>📝 {isStory ? Math.min(effectiveCard.config.size, storyWords) : effectiveCard.config.size} คำ</Chip>
+                <Chip>📝 {isStory ? Math.min(effectiveCard.config.size, storyWords) : effectiveCard.config.size} {isStory ? "รายการ" : "คำ"}</Chip>
                 {isStory && <Chip>{t.story?.length === "long" ? "เรื่องยาว" : "เรื่องสั้น"}</Chip>}
                 <Chip>{t.learningStyle === "wide" ? "กว้างขวาง" : t.learningStyle === "fast" ? "ฉับไว" : "คลาสสิก"}</Chip>
                 <Chip>{modeLabel[effectiveCard.config.mode]}</Chip>

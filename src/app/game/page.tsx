@@ -60,6 +60,7 @@ type ApiVocabWord = {
 
 type StudyStateResponse = {
   cards: PlayableCard[]
+  storyCards: PlayableCard[]
   examReadyIds: string[]
   hideMasteryPrompt: boolean
   styleDifficulty: Record<string, StyleDifficulty>
@@ -119,6 +120,7 @@ export default function GamePage() {
   const [styleDifficulty,setStyleDifficulty] = useState<Record<string,StyleDifficulty>>(DEFAULT_STYLE_DIFFICULTY)
   const [masteryPrompt,setMasteryPrompt] = useState<MasteryPrompt|null>(null)
   const [studyCards,setStudyCards] = useState<PlayableCard[]>([])
+  const [adminStoryCards,setAdminStoryCards] = useState<PlayableCard[]>([])
   const [storyReaderCard,setStoryReaderCard] = useState<PlayableCard|null>(null)
   const [wordManagerCard,setWordManagerCard] = useState<PlayableCard|null>(null)
   const [wordManagerIds,setWordManagerIds] = useState<string[]>([])
@@ -198,8 +200,9 @@ export default function GamePage() {
     mergeWordsIntoAllWords(words)
   }
 
-  function applyStudyState(data: { cards?: PlayableCard[]; examReadyIds?: string[]; hideMasteryPrompt?: boolean; styleDifficulty?: unknown; decks?: Record<string,string[]> }) {
+  function applyStudyState(data: { cards?: PlayableCard[]; storyCards?: PlayableCard[]; examReadyIds?: string[]; hideMasteryPrompt?: boolean; styleDifficulty?: unknown; decks?: Record<string,string[]> }) {
     if(data.cards) setStudyCards(data.cards.map(c => normalizeCard(c, c.learningStyle, "user")))
+    if(data.storyCards) setAdminStoryCards(data.storyCards)
     if(data.examReadyIds) setExamReadyIds(data.examReadyIds)
     if(typeof data.hideMasteryPrompt === "boolean") setHideMasteryPrompt(data.hideMasteryPrompt)
     if(data.styleDifficulty) setStyleDifficulty(normalizeStyleDifficulty(data.styleDifficulty))
@@ -226,7 +229,7 @@ export default function GamePage() {
 
   async function loadStudyState() {
     try {
-      const data = await studyRequest<{ cards: PlayableCard[]; examReadyIds: string[]; hideMasteryPrompt: boolean; styleDifficulty?: Record<string,StyleDifficulty>; decks?: Record<string,string[]> }>()
+      const data = await studyRequest<{ cards: PlayableCard[]; storyCards?: PlayableCard[]; examReadyIds: string[]; hideMasteryPrompt: boolean; styleDifficulty?: Record<string,StyleDifficulty>; decks?: Record<string,string[]> }>()
       if(data) applyStudyState(data)
       else setStudyCards(loadPlayableCards())
     } finally {
@@ -667,7 +670,7 @@ export default function GamePage() {
     setShowConfig(true)
   }
 
-  const storyCategoryOptions: QuizCategoryOption[] = [{ id:"story", label:"คำในเรื่อง", emoji:"📖", desc:"ใช้เฉพาะคำศัพท์จากเรื่องเล่านี้", count:activeCard?.story?.vocabulary.length }]
+  const storyCategoryOptions: QuizCategoryOption[] = [{ id:"story", label:"คำ/สำนวนในเรื่อง", emoji:"📖", desc:"ใช้เฉพาะคำศัพท์และสำนวนจากเรื่องเล่านี้", count:activeCard?.story?.vocabulary.length }]
   const activeCategoryOptions = activeCard?.story ? storyCategoryOptions : categoryOptions
 
   async function handleExamPassed(wordIds: string[]) {
@@ -776,6 +779,7 @@ export default function GamePage() {
         </div>
         <TemplateGrid
           cards={studyCards}
+          storyCards={adminStoryCards}
           styleDifficulty={styleDifficulty}
           onSelect={t=>queueStartQuiz(t,t.config)}
           onUseTemplate={t=>{ setPendingTemplate(t); setConfig(t.config); setShowSaveTpl(true) }}

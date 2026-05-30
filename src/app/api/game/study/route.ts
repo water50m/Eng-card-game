@@ -4,6 +4,7 @@ import { withAuth } from "@/lib/middleware"
 import { ensureStudySchema } from "@/lib/studySchema"
 import { ensureVocabularySchema } from "@/lib/vocabularySchema"
 import { normalizeStyleDifficulty } from "@/lib/studyCards"
+import { listStoryCards } from "@/lib/storyCardSchema"
 
 type StudyConfig = {
   category: string
@@ -268,6 +269,7 @@ async function getStudyState(userId: string) {
     [userId],
   )
   const decks = await listExistingDecks(userId, ["style-fast", "style-wide"])
+  const storyCards = await listStoryCards()
 
   return {
     cards: cards.rows.map(row => ({
@@ -287,6 +289,7 @@ async function getStudyState(userId: string) {
     examReadyIds: readyIds,
     hideMasteryPrompt: promptSetting.rows[0]?.value === true,
     styleDifficulty: normalizeStyleDifficulty(styleDifficultySetting.rows[0]?.value),
+    storyCards,
     decks,
   }
 }

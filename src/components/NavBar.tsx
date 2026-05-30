@@ -19,6 +19,7 @@ const NAV = [
 const ADMIN_NAV = [
   { href:"/admin",       label:"Admin",      icon:"🛡️" },
   { href:"/admin-vocab", label:"Vocab DB",   icon:"📚" },
+  { href:"/admin-stories", label:"Stories",  icon:"🕯️" },
   { href:"/theme-editor",label:"Themes",     icon:"🎨" },
 ]
 

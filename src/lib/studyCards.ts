@@ -34,7 +34,13 @@ export type StoryContent = {
   genre: "mystery" | "horror" | "puzzle"
   english: string[]
   thai: string[]
-  vocabulary: VocabWord[]
+  vocabulary: StoryGlossaryItem[]
+}
+
+export type StoryGlossaryItem = VocabWord & {
+  kind?: "word" | "idiom"
+  patterns?: string[]
+  note?: string
 }
 
 export type MasteryPrompt = {
@@ -114,6 +120,9 @@ export const STORY_CARDS: PlayableCard[] = [
         { id: "story-lantern-window-footprint", english: "footprint", thai: "รอยเท้า", phonetic: "FOOT-print", example: "A fresh footprint marked the hall.", category: "story", difficulty: 2 },
         { id: "story-lantern-window-diary", english: "diary", thai: "สมุดบันทึก", phonetic: "DYE-uh-ree", example: "The diary was open.", category: "story", difficulty: 2 },
         { id: "story-lantern-window-final", english: "final", thai: "สุดท้าย", phonetic: "FYE-nul", example: "Her name was on the final page.", category: "story", difficulty: 1 },
+        { id: "story-lantern-window-checked-into", english: "checked into", thai: "เข้าพัก / ลงทะเบียนเข้าที่พัก", phonetic: "chekt IN-too", example: "Mira checked into the abandoned hotel.", category: "story", difficulty: 2, kind: "idiom", patterns: ["checked into"], note: "phrasal verb ใช้กับโรงแรมหรือสถานที่พัก" },
+        { id: "story-lantern-window-swallowed-the-road", english: "swallowed the road", thai: "กลืนถนนให้หายไป / ทำให้ถนนมองไม่เห็น", phonetic: "SWOL-ohd thuh rohd", example: "The storm had swallowed the road.", category: "story", difficulty: 3, kind: "idiom", patterns: ["swallowed the road"], note: "ภาพเปรียบเทียบว่าอากาศหรือความมืดปกคลุมจนหายไป" },
+        { id: "story-lantern-window-lay-open", english: "lay open", thai: "วางเปิดค้างอยู่", phonetic: "lay OH-pun", example: "A diary lay open on the table.", category: "story", difficulty: 2, kind: "idiom", patterns: ["lay open"], note: "ใช้บรรยายสิ่งของที่เปิดค้างไว้เองเหมือนรอให้เห็น" },
       ],
     },
   },
@@ -155,6 +164,9 @@ export const STORY_CARDS: PlayableCard[] = [
         { id: "story-clockmaker-riddle-sealed", english: "sealed", thai: "ปิดผนึก", phonetic: "seeld", example: "A sealed letter appeared.", category: "story", difficulty: 2 },
         { id: "story-clockmaker-riddle-dated", english: "dated", thai: "ลงวันที่", phonetic: "DAY-ted", example: "The letter was dated tomorrow.", category: "story", difficulty: 2 },
         { id: "story-clockmaker-riddle-hide", english: "hide", thai: "ซ่อน", phonetic: "hyde", example: "Hide the key before night.", category: "story", difficulty: 1 },
+        { id: "story-clockmaker-riddle-wind-the-clock", english: "wind the clock", thai: "ไขลานนาฬิกา", phonetic: "wynd thuh klok", example: "Never wind the silver clock after sunset.", category: "story", difficulty: 3, kind: "idiom", patterns: ["wind the silver clock", "wind the clock"], note: "wind ในบริบทนี้ออกเสียงเหมือน wynd แปลว่าไขลาน" },
+        { id: "story-clockmaker-riddle-ticking-backward", english: "ticking backward", thai: "เดินถอยหลัง / เวลาถอยกลับ", phonetic: "TIK-ing BAK-werd", example: "Every clock began ticking backward.", category: "story", difficulty: 3, kind: "idiom", patterns: ["ticking backward"], note: "สำนวนเชิงภาพในเรื่องลึกลับ หมายถึงเวลาผิดธรรมชาติ" },
+        { id: "story-clockmaker-riddle-signed-by", english: "signed by", thai: "ลงชื่อโดย", phonetic: "synd by", example: "The letter was signed by the apprentice.", category: "story", difficulty: 2, kind: "idiom", patterns: ["signed by"], note: "ใช้บอกเจ้าของลายเซ็นหรือผู้เขียนจดหมาย" },
       ],
     },
   },
@@ -206,6 +218,9 @@ export const STORY_CARDS: PlayableCard[] = [
         { id: "story-well-beneath-school-pale", english: "pale", thai: "ซีด", phonetic: "payl", example: "A pale face rose from the water.", category: "story", difficulty: 2 },
         { id: "story-well-beneath-school-nailed", english: "nailed", thai: "ถูกตอกตะปู", phonetic: "nayld", example: "The board was nailed shut.", category: "story", difficulty: 2 },
         { id: "story-well-beneath-school-dust", english: "dust", thai: "ฝุ่น", phonetic: "dust", example: "His shoes were covered with dust.", category: "story", difficulty: 1 },
+        { id: "story-well-beneath-school-after-dusk", english: "after dusk", thai: "หลังพลบค่ำ", phonetic: "AF-ter dusk", example: "No teacher used the hallway after dusk.", category: "story", difficulty: 2, kind: "idiom", patterns: ["after dusk"], note: "ใช้บอกช่วงเวลาหลังแสงเย็นหมดไป" },
+        { id: "story-well-beneath-school-far-enough", english: "far enough", thai: "ไกลพอ / มากพอ", phonetic: "far ee-NUF", example: "We climbed down only far enough to see the well.", category: "story", difficulty: 2, kind: "idiom", patterns: ["far enough"], note: "ใช้บอกระดับที่พอดีต่อเป้าหมายหนึ่ง" },
+        { id: "story-well-beneath-school-nailed-shut", english: "nailed shut", thai: "ตอกปิดแน่น", phonetic: "nayld shut", example: "The loose board was nailed shut.", category: "story", difficulty: 3, kind: "idiom", patterns: ["nailed shut"], note: "หมายถึงปิดด้วยตะปูจนเปิดไม่ได้" },
       ],
     },
   },
@@ -257,6 +272,9 @@ export const STORY_CARDS: PlayableCard[] = [
         { id: "story-last-train-destination", english: "destination", thai: "ปลายทาง", phonetic: "des-tuh-NAY-shun", example: "The destination was printed on the ticket.", category: "story", difficulty: 3 },
         { id: "story-last-train-printed", english: "printed", thai: "ถูกพิมพ์", phonetic: "PRIN-ted", example: "A date was printed on it.", category: "story", difficulty: 2 },
         { id: "story-last-train-staring", english: "staring", thai: "จ้องมอง", phonetic: "STAIR-ing", example: "Everyone was staring at me.", category: "story", difficulty: 2 },
+        { id: "story-last-train-pretended-not-to-notice", english: "pretended not to notice", thai: "แกล้งทำเป็นไม่เห็น / ไม่สังเกต", phonetic: "pree-TEN-ded not too NOH-tis", example: "Everyone pretended not to notice.", category: "story", difficulty: 3, kind: "idiom", patterns: ["pretended not to notice"], note: "ใช้เมื่อคนรู้เห็น แต่ทำเหมือนไม่รู้" },
+        { id: "story-last-train-stepped-inside", english: "stepped inside", thai: "ก้าวเข้าไปข้างใน", phonetic: "stept in-SYD", example: "I stepped inside because the rain was freezing.", category: "story", difficulty: 2, kind: "idiom", patterns: ["stepped inside"], note: "ใช้กับการเข้าไปในพื้นที่ปิดหรือห้อง/รถ" },
+        { id: "story-last-train-lights-failed", english: "the lights failed", thai: "ไฟดับ / ไฟเสีย", phonetic: "thuh lyts fayld", example: "When the lights failed, a hand touched my pocket.", category: "story", difficulty: 3, kind: "idiom", patterns: ["the lights failed", "lights failed"], note: "failed แปลว่าใช้งานไม่ได้ ไม่ใช่แค่สอบตก" },
       ],
     },
   },

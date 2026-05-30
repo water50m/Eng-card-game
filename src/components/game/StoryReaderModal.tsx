@@ -1,7 +1,9 @@
 "use client"
 
+import { useMemo, useState } from "react"
+import type React from "react"
 import { motion } from "framer-motion"
-import type { PlayableCard } from "@/lib/studyCards"
+import type { PlayableCard, StoryGlossaryItem } from "@/lib/studyCards"
 import { Ico } from "./GameIcons"
 import { Chip } from "./GameUi"
 
@@ -12,7 +14,12 @@ export function StoryReaderModal({ card, onClose, onStart, onConfigure }: {
   onConfigure: () => void
 }) {
   const story = card.story
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [pinnedId, setPinnedId] = useState<string | null>(null)
+  const matchers = useMemo(() => story ? buildGlossaryMatchers(story.vocabulary) : [], [story])
   if (!story) return null
+  const idiomCount = story.vocabulary.filter(item => item.kind === "idiom").length
+  const wordCount = story.vocabulary.length - idiomCount
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -25,7 +32,8 @@ export function StoryReaderModal({ card, onClose, onStart, onConfigure }: {
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
               <Chip>{story.length === "long" ? "เรื่องยาว" : "เรื่องสั้น"}</Chip>
               <Chip>{story.genre === "puzzle" ? "ปริศนา" : story.genre === "horror" ? "สยองขวัญ" : "ลึกลับ"}</Chip>
-              <Chip>{story.vocabulary.length} คำศัพท์</Chip>
+              <Chip>{wordCount} คำศัพท์</Chip>
+              <Chip>{idiomCount} สำนวน</Chip>
             </div>
             <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", margin: 0, lineHeight: 1.25 }}>
               <span style={{ marginRight: "8px" }}>{card.emoji}</span>{card.name}
@@ -35,12 +43,18 @@ export function StoryReaderModal({ card, onClose, onStart, onConfigure }: {
         </div>
 
         <div style={{ padding: "18px 20px 20px" }}>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "12px", padding: "10px 12px", borderRadius: "12px", border: "1px solid var(--border-default)", background: "var(--bg-subtle)" }}>
+            <span style={{ width: "10px", height: "10px", borderRadius: "9999px", background: "#f59e0b", boxShadow: "0 0 0 3px rgba(245,158,11,0.18)" }} />
+            <span style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+              คำหรือสำนวนที่มีเส้นใต้สีทองสามารถเอาเมาส์ชี้หรือคลิก 1 ครั้งเพื่อดูความหมายได้
+            </span>
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: "14px", marginBottom: "18px" }}>
             <section style={{ border: "1px solid var(--border-default)", borderRadius: "12px", padding: "14px", background: "var(--bg-surface)" }}>
               <h3 style={{ fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, color: "var(--accent-primary)", margin: "0 0 10px" }}>English</h3>
               {story.english.map((paragraph, index) => (
                 <p key={index} style={{ fontFamily: "var(--font-body)", fontSize: "14px", lineHeight: 1.65, color: "var(--text-primary)", margin: index === 0 ? "0 0 12px" : "12px 0" }}>
-                  {paragraph}
+                  {renderInteractiveText(paragraph, matchers, hoveredId, pinnedId, setHoveredId, setPinnedId)}
                 </p>
               ))}
             </section>
@@ -54,18 +68,6 @@ export function StoryReaderModal({ card, onClose, onStart, onConfigure }: {
             </section>
           </div>
 
-          <div style={{ marginBottom: "18px" }}>
-            <h3 style={{ fontFamily: "var(--font-body)", fontSize: "13px", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 10px" }}>คำศัพท์ในเรื่อง</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: "8px" }}>
-              {story.vocabulary.map(word => (
-                <div key={word.id} style={{ border: "1px solid var(--border-default)", borderRadius: "10px", padding: "9px 10px", background: "var(--bg-surface)" }}>
-                  <div style={{ fontFamily: "var(--font-body)", fontSize: "13px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "2px" }}>{word.english}</div>
-                  <div style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: "var(--text-muted)", lineHeight: 1.35 }}>{word.thai}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end", borderTop: "1px solid var(--border-default)", paddingTop: "16px" }}>
             <button onClick={onConfigure} style={{ padding: "11px 16px", borderRadius: "12px", border: "1px solid var(--accent-primary)", background: "transparent", color: "var(--accent-primary)", fontFamily: "var(--font-body)", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>
               ⚙️ ตั้งค่าเกม
@@ -77,5 +79,119 @@ export function StoryReaderModal({ card, onClose, onStart, onConfigure }: {
         </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+type GlossaryMatcher = {
+  term: string
+  item: StoryGlossaryItem
+}
+
+function buildGlossaryMatchers(items: StoryGlossaryItem[]): GlossaryMatcher[] {
+  const seen = new Set<string>()
+  return items
+    .flatMap(item => [item.english, ...(item.patterns ?? [])].map(term => ({ term: term.trim(), item })))
+    .filter(entry => {
+      const key = entry.term.toLowerCase()
+      if (!entry.term || seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .sort((a, b) => b.term.length - a.term.length)
+}
+
+function isWordChar(char: string | undefined) {
+  return Boolean(char && /[a-zA-Z0-9'-]/.test(char))
+}
+
+function matchesAt(text: string, index: number, term: string) {
+  if (text.slice(index, index + term.length).toLowerCase() !== term.toLowerCase()) return false
+  const before = text[index - 1]
+  const after = text[index + term.length]
+  return !isWordChar(before) && !isWordChar(after)
+}
+
+function renderInteractiveText(
+  text: string,
+  matchers: GlossaryMatcher[],
+  hoveredId: string | null,
+  pinnedId: string | null,
+  setHoveredId: (id: string | null) => void,
+  setPinnedId: (id: string | null) => void,
+) {
+  const nodes: React.ReactNode[] = []
+  let index = 0
+  while (index < text.length) {
+    const match = matchers.find(entry => matchesAt(text, index, entry.term))
+    if (!match) {
+      nodes.push(text[index])
+      index += 1
+      continue
+    }
+
+    const label = text.slice(index, index + match.term.length)
+    const isActive = hoveredId === match.item.id || pinnedId === match.item.id
+    nodes.push(
+      <span key={`${match.item.id}-${index}`} style={{ position: "relative", display: "inline-block" }}>
+        <button
+          type="button"
+          onMouseEnter={() => setHoveredId(match.item.id)}
+          onMouseLeave={() => setHoveredId(null)}
+          onClick={event => {
+            event.stopPropagation()
+            setPinnedId(pinnedId === match.item.id ? null : match.item.id)
+          }}
+          title={`${match.item.thai}${match.item.kind === "idiom" ? " (สำนวน)" : ""}`}
+          style={{
+            border: "none",
+            borderBottom: `2px ${match.item.kind === "idiom" ? "solid" : "dotted"} #f59e0b`,
+            background: isActive ? "rgba(245,158,11,0.18)" : "rgba(245,158,11,0.08)",
+            color: "var(--text-primary)",
+            borderRadius: "5px",
+            padding: "0 3px",
+            margin: "0 1px",
+            font: "inherit",
+            cursor: "help",
+            lineHeight: 1.45,
+          }}
+        >
+          {label}
+        </button>
+        {isActive && <GlossaryPopup item={match.item} />}
+      </span>,
+    )
+    index += match.term.length
+  }
+  return nodes
+}
+
+function GlossaryPopup({ item }: { item: StoryGlossaryItem }) {
+  return (
+    <span style={{
+      position: "absolute",
+      left: "50%",
+      bottom: "calc(100% + 8px)",
+      transform: "translateX(-50%)",
+      zIndex: 10,
+      width: "min(260px, 76vw)",
+      padding: "10px 12px",
+      borderRadius: "12px",
+      border: "1px solid var(--border-default)",
+      background: "var(--bg-elevated)",
+      boxShadow: "0 10px 28px rgba(0,0,0,0.28)",
+      color: "var(--text-primary)",
+      fontFamily: "var(--font-body)",
+      fontSize: "12px",
+      lineHeight: 1.4,
+      whiteSpace: "normal",
+      pointerEvents: "none",
+    }}>
+      <span style={{ display: "flex", justifyContent: "space-between", gap: "8px", marginBottom: "4px" }}>
+        <strong style={{ color: "var(--accent-primary)" }}>{item.english}</strong>
+        <span style={{ color: item.kind === "idiom" ? "#f59e0b" : "var(--text-muted)", fontSize: "10px", fontWeight: 700 }}>{item.kind === "idiom" ? "สำนวน" : "คำศัพท์"}</span>
+      </span>
+      <span style={{ display: "block", marginBottom: item.note ? "4px" : 0 }}>{item.thai}</span>
+      {item.note && <span style={{ display: "block", color: "var(--text-muted)" }}>{item.note}</span>}
+    </span>
   )
 }
